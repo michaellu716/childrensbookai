@@ -626,11 +626,12 @@ const CreateStory = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : null}
-          </div>
-        </div>
-      </div>
-    </ErrorBoundary>
-  );
+           </div>
+         </div>
+       </div>
+     </div>
+   </ErrorBoundary>
+ );
 };
 
 export default CreateStory;
