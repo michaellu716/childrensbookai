@@ -111,7 +111,6 @@ Be specific and detailed to ensure consistent character generation. Focus on fea
 
     for (let i = 0; i < avatarStyles.length; i++) {
       const style = avatarStyles[i];
-      console.log(`Generating ${style} avatar...`);
       
       const prompt = `Create a ${style} portrait of a child character based on these features:
 - Hair: ${characterFeatures.hairColor} ${characterFeatures.hairStyle}
@@ -124,6 +123,8 @@ ${characterFeatures.distinctiveFeatures ? `- Features: ${characterFeatures.disti
 
 Style: ${style}, child-friendly, warm and appealing, suitable for a children's storybook, clean background, high quality illustration`;
 
+      console.log(`Generating ${style} avatar with prompt:`, prompt);
+      
       const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
         method: 'POST',
         headers: {
@@ -131,12 +132,12 @@ Style: ${style}, child-friendly, warm and appealing, suitable for a children's s
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-image-1',
+          model: 'dall-e-3',
           prompt: prompt,
           n: 1,
           size: '1024x1024',
-          quality: 'high',
-          output_format: 'png'
+          quality: 'standard',
+          response_format: 'b64_json'
         }),
       });
 
@@ -147,19 +148,22 @@ Style: ${style}, child-friendly, warm and appealing, suitable for a children's s
       }
 
       const imageData = await imageResponse.json();
+      console.log(`Image response for ${style}:`, {
+        hasData: !!imageData.data,
+        dataLength: imageData.data?.length || 0,
+        firstImageKeys: imageData.data?.[0] ? Object.keys(imageData.data[0]) : []
+      });
       
-      // gpt-image-1 returns base64 directly, not in a data array like DALL-E
-      const imageBase64 = imageData.data ? imageData.data[0].b64_json : imageData.b64_json;
-      
-      if (imageBase64) {
+      // Handle DALL-E-3 response format
+      if (imageData.data && imageData.data[0] && imageData.data[0].b64_json) {
         generatedAvatars.push({
           style: style,
-          imageUrl: `data:image/png;base64,${imageBase64}`,
+          imageUrl: `data:image/png;base64,${imageData.data[0].b64_json}`,
           prompt: prompt
         });
         console.log(`Successfully generated ${style} avatar`);
       } else {
-        console.error(`No image data received for ${style} avatar`);
+        console.error(`No image data received for ${style} avatar. Response:`, imageData);
       }
     }
 
