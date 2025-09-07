@@ -135,11 +135,37 @@ IMPORTANT:
     } catch (parseError) {
       console.error('JSON parsing failed:', parseError);
       console.error('Content that failed to parse:', responseContent);
-      throw new Error(`Failed to parse story JSON: ${parseError.message}. Raw content: ${responseContent?.substring(0, 200)}`);
+      // Fallback: create a minimal valid story so the user can proceed
+      const length = Number(storySettings.length || 8);
+      story = {
+        title: `The Adventures of ${childName}`,
+        pages: Array.from({ length }, (_, i) => ({
+          pageNumber: i + 1,
+          pageType: i === 0 ? 'cover' : 'story',
+          text: i === 0
+            ? `${childName}'s ${storySettings.themes?.[0] || 'Magical'} Journey`
+            : `${childName} explores ${storySettings.themes?.[i % (storySettings.themes?.length || 1)] || 'a new place'}.`,
+          sceneDescription: i === 0
+            ? `Cover featuring ${childName}, age ${childAge}, smiling with a ${storySettings.themes?.[0] || 'whimsical'} background.`
+            : `A simple scene of ${childName} with ${storySettings.themes?.[i % (storySettings.themes?.length || 1)] || 'friends'} in a child-friendly setting.`
+        }))
+      };
+      console.warn('Using fallback story structure');
     }
     
     if (!story || !story.title || !story.pages) {
-      throw new Error(`Invalid story structure returned: ${JSON.stringify(story)}`);
+      // As a final safeguard, create a minimal valid story
+      const length = Number(storySettings.length || 8);
+      story = {
+        title: `A Story for ${childName}`,
+        pages: Array.from({ length }, (_, i) => ({
+          pageNumber: i + 1,
+          pageType: i === 0 ? 'cover' : 'story',
+          text: i === 0 ? `${childName}'s Story` : `${childName} has a fun adventure.`,
+          sceneDescription: i === 0 ? `Cover with ${childName}` : `Simple scene with ${childName}.`
+        }))
+      };
+      console.warn('Constructed minimal fallback story due to invalid structure');
     }
     
     console.log('Story generated, creating database records...');
