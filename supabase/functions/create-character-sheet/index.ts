@@ -78,6 +78,13 @@ Be specific and detailed to ensure consistent character generation. Focus on fea
     });
 
     if (!visionResponse.ok) {
+      const errorText = await visionResponse.text();
+      console.error('Vision API error:', visionResponse.status, errorText);
+      
+      if (visionResponse.status === 429) {
+        throw new Error('OpenAI API rate limit reached. Please try again in a few minutes or skip the photo feature for now.');
+      }
+      
       throw new Error(`Vision analysis failed: ${visionResponse.statusText}`);
     }
 
