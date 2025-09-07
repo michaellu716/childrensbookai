@@ -100,7 +100,7 @@ Requirements:
           }
         ],
         max_completion_tokens: 2000,
-        temperature: 0.7
+        
       }),
     });
 
@@ -139,9 +139,6 @@ Requirements:
       savedCharacterSheet = data;
     }
 
-    // Extract child name from story settings or character sheet
-    const childName = characterSheet?.name || storySettings.childName || 'Child';
-    const childAge = characterSheet?.age || storySettings.childAge || null;
 
     // Save story to database
     const { data: savedStory, error: storyError } = await supabase
@@ -187,7 +184,7 @@ Requirements:
       page_number: page.pageNumber,
       page_type: page.pageType,
       text_content: page.text,
-      image_prompt: createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle.style)
+      image_prompt: createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle?.style || 'cartoon')
     }));
 
     const { error: pagesError } = await supabase
@@ -201,7 +198,7 @@ Requirements:
     return new Response(JSON.stringify({ 
       storyId: savedStory.id,
       story: story,
-      characterSheetId: savedCharacterSheet.id,
+      characterSheetId: savedCharacterSheet?.id || null,
       status: 'generating_illustrations'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -229,7 +226,7 @@ async function generateStoryIllustrations(
     for (const page of pages) {
       console.log(`Generating illustration for page ${page.pageNumber}...`);
       
-      const imagePrompt = createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle.style);
+      const imagePrompt = createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle?.style || 'cartoon');
       
       const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
         method: 'POST',
