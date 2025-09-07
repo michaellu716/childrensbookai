@@ -105,11 +105,24 @@ Requirements:
     });
 
     if (!storyResponse.ok) {
+      const errorText = await storyResponse.text();
+      console.error('Story generation failed:', storyResponse.status, errorText);
       throw new Error(`Story generation failed: ${storyResponse.statusText}`);
     }
 
     const storyData = await storyResponse.json();
-    const story = JSON.parse(storyData.choices[0].message.content);
+    
+    // Extract JSON content from markdown formatting if present
+    let responseContent = storyData.choices[0].message.content;
+    console.log('Raw OpenAI response:', responseContent.substring(0, 200));
+    
+    const jsonMatch = responseContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      responseContent = jsonMatch[1];
+      console.log('Extracted JSON from markdown');
+    }
+    
+    const story = JSON.parse(responseContent);
     
     console.log('Story generated, creating database records...');
 
