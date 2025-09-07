@@ -22,6 +22,14 @@ export const AvatarStyleSelector: React.FC<AvatarStyleSelectorProps> = ({
   onStyleSelect,
   isLoading = false
 }) => {
+  // Debug logging
+  console.log('AvatarStyleSelector props:', {
+    avatarStyles,
+    avatarStylesLength: avatarStyles?.length,
+    selectedStyle,
+    isLoading
+  });
+
   if (isLoading) {
     return (
       <Card className="p-8 text-center">
@@ -40,7 +48,10 @@ export const AvatarStyleSelector: React.FC<AvatarStyleSelectorProps> = ({
       <Card className="p-8 text-center">
         <h3 className="text-lg font-semibold mb-2">Choose Your Child's Cartoon Style</h3>
         <p className="text-muted-foreground mb-4">
-          No avatar styles available. Please go back and create character styles first.
+          No avatar styles available. The image generation may have failed due to API limits.
+        </p>
+        <p className="text-sm text-muted-foreground mb-4">
+          Debug info: Received {avatarStyles?.length || 0} avatar styles
         </p>
         <Button variant="outline" onClick={() => window.history.back()}>
           Go Back to Create Character

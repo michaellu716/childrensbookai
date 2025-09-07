@@ -97,6 +97,9 @@ const CreateStory = () => {
         }
 
         setCharacterSheet(data.characterSheet);
+        console.log('Character sheet created:', data.characterSheet);
+        console.log('Generated avatars count:', data.characterSheet?.generatedAvatars?.length || 0);
+        console.log('Generated avatars:', data.characterSheet?.generatedAvatars);
         toast.success("Character styles created! Choose your favorite.");
         
         // Automatically move to next step after successful character creation

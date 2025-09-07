@@ -106,6 +106,8 @@ Be specific and detailed to ensure consistent character generation. Focus on fea
     
     const avatarStyles = ['Disney-style cartoon', 'Pixar-style 3D cartoon', 'Studio Ghibli-style illustration'];
     const generatedAvatars = [];
+    
+    console.log('Starting avatar generation for styles:', avatarStyles);
 
     for (let i = 0; i < avatarStyles.length; i++) {
       const style = avatarStyles[i];
