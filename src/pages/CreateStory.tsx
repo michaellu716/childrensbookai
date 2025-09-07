@@ -13,6 +13,7 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 import { AvatarStyleSelector } from "@/components/AvatarStyleSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const CreateStory = () => {
   const navigate = useNavigate();
@@ -281,7 +282,8 @@ const CreateStory = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -627,7 +629,7 @@ const CreateStory = () => {
           </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 
