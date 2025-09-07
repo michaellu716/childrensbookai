@@ -89,7 +89,15 @@ Be specific and detailed to ensure consistent character generation. Focus on fea
     }
 
     const visionData = await visionResponse.json();
-    const characterFeatures = JSON.parse(visionData.choices[0].message.content);
+    
+    // Extract JSON content from markdown formatting if present
+    let responseContent = visionData.choices[0].message.content;
+    const jsonMatch = responseContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      responseContent = jsonMatch[1];
+    }
+    
+    const characterFeatures = JSON.parse(responseContent);
     
     console.log('Character features extracted:', characterFeatures);
 
