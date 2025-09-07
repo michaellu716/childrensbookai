@@ -70,7 +70,7 @@ const CreateStory = () => {
     setSelectedAvatarStyle(null);
   };
 
-  const createCharacterSheet = async () => {
+  const createCharacterSheet = async (retryCount = 0) => {
     if (!formData.photo || !formData.childName) {
       toast.error("Please provide a photo and child's name");
       return;
@@ -109,15 +109,31 @@ const CreateStory = () => {
     } catch (error: any) {
       console.error('Error creating character sheet:', error);
       
-      // Handle rate limiting specifically
-      if (error.message?.includes('Too Many Requests')) {
-        toast.error("OpenAI API rate limit reached. Please try again in a few minutes.");
+      // Handle rate limiting with retry logic
+      if (error.message?.includes('Too Many Requests') && retryCount < 2) {
+        const waitTime = (retryCount + 1) * 5000; // 5s, 10s
+        toast.error(`API rate limit reached. Retrying in ${waitTime/1000} seconds...`);
+        setTimeout(() => {
+          createCharacterSheet(retryCount + 1);
+        }, waitTime);
+        return;
+      } else if (error.message?.includes('Too Many Requests')) {
+        toast.error("OpenAI API is currently overloaded. You can skip the photo feature and continue without character customization.");
       } else {
         toast.error(error.message || "Failed to create character. Please try again.");
       }
     } finally {
       setIsCreatingCharacter(false);
     }
+  };
+
+  const skipPhotoFeature = () => {
+    setFormData(prev => ({ ...prev, includePhoto: false, photo: null }));
+    setUploadedPhoto("");
+    setCharacterSheet(null);
+    setSelectedAvatarStyle(null);
+    toast.success("Skipped photo feature. You can still create amazing stories!");
+    setCurrentStep(currentStep + 1);
   };
 
   const handleAvatarStyleSelect = (style: any) => {
@@ -364,9 +380,9 @@ const CreateStory = () => {
               />
               
               {formData.photo && !characterSheet && (
-                <div className="mt-6 text-center">
+                <div className="mt-6 space-y-3">
                   <Button
-                    onClick={createCharacterSheet}
+                    onClick={() => createCharacterSheet()}
                     disabled={isCreatingCharacter}
                     className="w-full"
                   >
@@ -376,9 +392,19 @@ const CreateStory = () => {
                       <>Create Cartoon Character</>
                     )}
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    This will analyze the photo and create cartoon versions
-                  </p>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      This will analyze the photo and create cartoon versions
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={skipPhotoFeature}
+                      disabled={isCreatingCharacter}
+                      className="text-xs"
+                    >
+                      Skip Photo Feature
+                    </Button>
+                  </div>
                 </div>
               )}
               
@@ -387,6 +413,18 @@ const CreateStory = () => {
                   <p className="text-sm text-success font-medium mb-2">
                     ✓ Character styles created! You can now proceed to the next step.
                   </p>
+                </div>
+              )}
+              
+              {!formData.photo && (
+                <div className="mt-6 text-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentStep(currentStep + 1)}
+                    className="w-full"
+                  >
+                    Continue Without Photo
+                  </Button>
                 </div>
               )}
             </Card>
