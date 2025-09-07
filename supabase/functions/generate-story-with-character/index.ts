@@ -327,8 +327,18 @@ async function generateStoryIllustrations(
       const imageData = await imageResponse.json();
       console.log(`Image response for page ${page.pageNumber}:`, JSON.stringify(imageData).substring(0, 200));
       
-      // gpt-image-1 returns base64 directly in the response
-      const imageUrl = `data:image/png;base64,${imageData.data[0].b64_json || imageData.data[0]}`;;
+      // gpt-image-1 returns base64 directly in the response (no .data array structure)
+      let base64Data = '';
+      if (imageData.data && imageData.data.length > 0) {
+        // Legacy DALL-E format
+        base64Data = imageData.data[0].b64_json || imageData.data[0];
+      } else {
+        // gpt-image-1 format - base64 string directly in response
+        base64Data = imageData.b64_json || imageData;
+      }
+      
+      const imageUrl = `data:image/png;base64,${base64Data}`;
+      console.log(`Generated image URL length for page ${page.pageNumber}:`, imageUrl.length);
 
       // Update story page with generated image
       const { error: updateError } = await supabase
@@ -353,16 +363,34 @@ async function generateStoryIllustrations(
       .update({ status: 'completed' })
       .eq('id', storyId);
 
-    console.log(`Story ${storyId} illustrations completed`);
+    console.log(`Story ${storyId} illustrations completed successfully`);
+    
+    // Verify all pages have images
+    const { data: pagesCheck } = await supabase
+      .from('story_pages')
+      .select('page_number, image_url')
+      .eq('story_id', storyId)
+      .is('image_url', null);
+    
+    if (pagesCheck && pagesCheck.length > 0) {
+      console.warn(`Warning: ${pagesCheck.length} pages still missing images for story ${storyId}`);
+    }
 
   } catch (error) {
     console.error('Error generating illustrations:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     
     // Mark story as failed
-    await supabase
-      .from('stories')
-      .update({ status: 'failed' })
-      .eq('id', storyId);
+    try {
+      await supabase
+        .from('stories')
+        .update({ status: 'failed' })
+        .eq('id', storyId);
+      console.log(`Story ${storyId} marked as failed due to illustration generation error`);
+    } catch (dbError) {
+      console.error('Failed to update story status to failed:', dbError);
+    }
   }
 }
 
