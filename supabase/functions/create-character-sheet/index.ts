@@ -141,17 +141,26 @@ Style: ${style}, child-friendly, warm and appealing, suitable for a children's s
       });
 
       if (!imageResponse.ok) {
-        console.error(`Failed to generate ${style} avatar:`, imageResponse.statusText);
+        const errorText = await imageResponse.text();
+        console.error(`Failed to generate ${style} avatar:`, imageResponse.status, errorText);
         continue;
       }
 
       const imageData = await imageResponse.json();
       
-      generatedAvatars.push({
-        style: style,
-        imageUrl: `data:image/png;base64,${imageData.data[0].b64_json}`,
-        prompt: prompt
-      });
+      // gpt-image-1 returns base64 directly, not in a data array like DALL-E
+      const imageBase64 = imageData.data ? imageData.data[0].b64_json : imageData.b64_json;
+      
+      if (imageBase64) {
+        generatedAvatars.push({
+          style: style,
+          imageUrl: `data:image/png;base64,${imageBase64}`,
+          prompt: prompt
+        });
+        console.log(`Successfully generated ${style} avatar`);
+      } else {
+        console.error(`No image data received for ${style} avatar`);
+      }
     }
 
     console.log(`Generated ${generatedAvatars.length} avatar styles`);
