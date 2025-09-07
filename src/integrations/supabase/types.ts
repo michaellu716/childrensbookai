@@ -87,7 +87,7 @@ export type Database = {
         Row: {
           art_style: string | null
           character_sheet_id: string | null
-          child_age: number | null
+          child_age: string | null
           child_name: string | null
           created_at: string | null
           id: string
@@ -108,7 +108,7 @@ export type Database = {
         Insert: {
           art_style?: string | null
           character_sheet_id?: string | null
-          child_age?: number | null
+          child_age?: string | null
           child_name?: string | null
           created_at?: string | null
           id?: string
@@ -129,7 +129,7 @@ export type Database = {
         Update: {
           art_style?: string | null
           character_sheet_id?: string | null
-          child_age?: number | null
+          child_age?: string | null
           child_name?: string | null
           created_at?: string | null
           id?: string
