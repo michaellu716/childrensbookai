@@ -37,12 +37,17 @@ const CreateStory = () => {
     language: "english"
   });
 
+  // Debug logging
+  console.log('CreateStory render:', { currentStep, isGenerating, formData });
+
   // Persist minimal wizard state (avoid storing large images)
   useEffect(() => {
+    console.log('Loading saved state from localStorage');
     try {
       const saved = localStorage.getItem('createStoryState');
       if (saved) {
         const state = JSON.parse(saved);
+        console.log('Loaded state:', state);
         if (state.currentStep) setCurrentStep(state.currentStep);
         if (state.formData) setFormData((prev) => ({ ...prev, ...state.formData, photo: null }));
       }
@@ -264,6 +269,7 @@ const CreateStory = () => {
   };
 
   if (isGenerating) {
+    console.log('Rendering generating state');
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="w-full max-w-md p-8 text-center bg-gradient-card">
@@ -280,6 +286,8 @@ const CreateStory = () => {
       </div>
     );
   }
+
+  console.log('Rendering main CreateStory component', { currentStep });
 
   return (
     <ErrorBoundary>
