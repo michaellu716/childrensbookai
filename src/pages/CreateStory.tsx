@@ -9,11 +9,19 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Upload, Sparkles, BookOpen, Palette } from "lucide-react";
+import { PhotoUpload } from "@/components/PhotoUpload";
+import { AvatarStyleSelector } from "@/components/AvatarStyleSelector";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const CreateStory = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCreatingCharacter, setIsCreatingCharacter] = useState(false);
+  const [characterSheet, setCharacterSheet] = useState<any>(null);
+  const [selectedAvatarStyle, setSelectedAvatarStyle] = useState<any>(null);
+  const [uploadedPhoto, setUploadedPhoto] = useState<string>("");
   const [formData, setFormData] = useState({
     childName: "",
     age: "",
@@ -50,23 +58,129 @@ const CreateStory = () => {
     }));
   };
 
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setFormData(prev => ({ ...prev, photo: file }));
+  const handlePhotoSelected = (file: File, preview: string) => {
+    setFormData(prev => ({ ...prev, photo: file, includePhoto: true }));
+    setUploadedPhoto(preview);
+  };
+
+  const handleRemovePhoto = () => {
+    setFormData(prev => ({ ...prev, photo: null, includePhoto: false }));
+    setUploadedPhoto("");
+    setCharacterSheet(null);
+    setSelectedAvatarStyle(null);
+  };
+
+  const createCharacterSheet = async () => {
+    if (!formData.photo || !formData.childName) {
+      toast.error("Please provide a photo and child's name");
+      return;
+    }
+
+    setIsCreatingCharacter(true);
+    
+    try {
+      // Convert file to base64 for API call
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const photoUrl = e.target?.result as string;
+        
+        const { data, error } = await supabase.functions.invoke('create-character-sheet', {
+          body: {
+            photoUrl,
+            childName: formData.childName,
+            childAge: formData.age
+          }
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        setCharacterSheet(data.characterSheet);
+        toast.success("Character styles created! Choose your favorite.");
+      };
+      
+      reader.readAsDataURL(formData.photo);
+    } catch (error: any) {
+      console.error('Error creating character sheet:', error);
+      toast.error(error.message || "Failed to create character. Please try again.");
+    } finally {
+      setIsCreatingCharacter(false);
     }
   };
 
-  const handleGenerate = async () => {
-    setIsGenerating(true);
-    // Simulate generation process
-    setTimeout(() => {
-      navigate('/review');
-    }, 3000);
+  const handleAvatarStyleSelect = (style: any) => {
+    setSelectedAvatarStyle(style);
   };
 
-  const nextStep = () => {
-    if (currentStep < 4) setCurrentStep(currentStep + 1);
+  const handleGenerate = async () => {
+    if (!formData.childName || formData.themes.length === 0) {
+      toast.error("Please provide child's name and select at least one theme");
+      return;
+    }
+
+    if (formData.includePhoto && !selectedAvatarStyle) {
+      toast.error("Please select an avatar style for your character");
+      return;
+    }
+
+    setIsGenerating(true);
+    
+    try {
+      const storyPrompt = `Create a ${formData.tone} story for ${formData.childName} (age ${formData.age}) featuring themes: ${formData.themes.join(", ")}. ${formData.lesson ? `Include the lesson: ${formData.lesson}.` : ""}`;
+      
+      const { data, error } = await supabase.functions.invoke('generate-story-with-character', {
+        body: {
+          storyPrompt,
+          characterSheet,
+          selectedAvatarStyle,
+          storySettings: {
+            length: parseInt(formData.length),
+            tone: formData.tone,
+            themes: formData.themes,
+            lesson: formData.lesson,
+            readingLevel: formData.readingLevel,
+            language: formData.language
+          }
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Navigate to review with story ID
+      navigate(`/review?storyId=${data.storyId}`);
+      
+    } catch (error: any) {
+      console.error('Error generating story:', error);
+      toast.error(error.message || "Failed to generate story. Please try again.");
+      setIsGenerating(false);
+    }
+  };
+
+  const nextStep = async () => {
+    // Validate step 1
+    if (currentStep === 1 && (!formData.childName || formData.themes.length === 0)) {
+      toast.error("Please provide child's name and select at least one theme");
+      return;
+    }
+    
+    // Handle photo upload to character creation
+    if (currentStep === 2 && formData.includePhoto && formData.photo && !characterSheet) {
+      await createCharacterSheet();
+      return;
+    }
+    
+    // Validate character selection
+    if (currentStep === 3 && formData.includePhoto && !selectedAvatarStyle) {
+      toast.error("Please select an avatar style");
+      return;
+    }
+    
+    if (currentStep < (formData.includePhoto ? 5 : 4)) {
+      setCurrentStep(currentStep + 1);
+    }
   };
 
   const prevStep = () => {
@@ -106,7 +220,7 @@ const CreateStory = () => {
               <span className="font-semibold">Story Creator</span>
             </div>
             <div className="text-sm text-muted-foreground">
-              Step {currentStep} of 4
+              Step {currentStep} of {formData.includePhoto ? 5 : 4}
             </div>
           </div>
         </div>
@@ -115,12 +229,15 @@ const CreateStory = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Progress Bar */}
         <div className="mb-8">
-          <Progress value={(currentStep / 4) * 100} className="mb-2" />
+          <Progress value={(currentStep / (formData.includePhoto ? 5 : 4)) * 100} className="mb-2" />
           <div className="flex justify-between text-sm text-muted-foreground">
             <span className={currentStep >= 1 ? "text-primary font-medium" : ""}>Story Details</span>
             <span className={currentStep >= 2 ? "text-primary font-medium" : ""}>Photo Upload</span>
-            <span className={currentStep >= 3 ? "text-primary font-medium" : ""}>Style & Format</span>
-            <span className={currentStep >= 4 ? "text-primary font-medium" : ""}>Generate</span>
+            {formData.includePhoto && (
+              <span className={currentStep >= 3 ? "text-primary font-medium" : ""}>Character Style</span>
+            )}
+            <span className={currentStep >= (formData.includePhoto ? 4 : 3) ? "text-primary font-medium" : ""}>Style & Format</span>
+            <span className={currentStep >= (formData.includePhoto ? 5 : 4) ? "text-primary font-medium" : ""}>Generate</span>
           </div>
         </div>
 
@@ -227,66 +344,44 @@ const CreateStory = () => {
             <Card className="p-8 bg-gradient-card">
               <h2 className="text-2xl font-bold mb-6 text-center">Add Your Child's Photo (Optional)</h2>
               
-              <div className="space-y-6">
-                <div className="text-center">
-                  <div className="border-2 border-dashed border-border rounded-lg p-12 bg-muted/30">
-                    <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <div className="space-y-2">
-                      <p className="text-lg font-medium">Upload a photo of your child</p>
-                      <p className="text-sm text-muted-foreground">
-                        We'll create a cartoon character based on this photo
-                      </p>
-                    </div>
-                    <Button variant="outline" className="mt-4" asChild>
-                      <label htmlFor="photo-upload" className="cursor-pointer">
-                        Choose Photo
-                        <input
-                          id="photo-upload"
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoUpload}
-                          className="sr-only"
-                        />
-                      </label>
-                    </Button>
-                  </div>
+              <PhotoUpload
+                onPhotoSelected={handlePhotoSelected}
+                selectedPhoto={uploadedPhoto}
+                onRemovePhoto={handleRemovePhoto}
+              />
+              
+              {formData.photo && !characterSheet && (
+                <div className="mt-6 text-center">
+                  <Button
+                    onClick={createCharacterSheet}
+                    disabled={isCreatingCharacter}
+                    className="w-full"
+                  >
+                    {isCreatingCharacter ? (
+                      <>Creating Character Styles...</>
+                    ) : (
+                      <>Create Cartoon Character</>
+                    )}
+                  </Button>
                 </div>
-
-                {formData.photo && (
-                  <div className="text-center">
-                    <p className="text-sm text-success font-medium">
-                      ✓ Photo uploaded: {formData.photo.name}
-                    </p>
-                    <div className="flex items-center justify-center mt-4">
-                      <input
-                        type="checkbox"
-                        id="include-photo"
-                        checked={formData.includePhoto}
-                        onChange={(e) => setFormData(prev => ({ ...prev, includePhoto: e.target.checked }))}
-                        className="mr-2"
-                      />
-                      <Label htmlFor="include-photo">
-                        Include cartoon character based on this photo
-                      </Label>
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <h3 className="font-medium mb-2">Tips for best results:</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Use a clear, close-up photo of your child's face</li>
-                    <li>• Good lighting works best</li>
-                    <li>• JPG, PNG, or WebP formats supported</li>
-                    <li>• We'll automatically crop to focus on the face</li>
-                  </ul>
-                </div>
-              </div>
+              )}
             </Card>
           )}
 
-          {/* Step 3: Style & Format */}
-          {currentStep === 3 && (
+          {/* Step 3: Character Style Selection */}
+          {currentStep === 3 && formData.includePhoto && (
+            <Card className="p-8 bg-gradient-card">
+              <AvatarStyleSelector
+                avatarStyles={characterSheet?.generatedAvatars || []}
+                selectedStyle={selectedAvatarStyle}
+                onStyleSelect={handleAvatarStyleSelect}
+                isLoading={isCreatingCharacter}
+              />
+            </Card>
+          )}
+
+          {/* Step 4/3: Style & Format */}
+          {currentStep === (formData.includePhoto ? 4 : 3) && (
             <Card className="p-8 bg-gradient-card">
               <h2 className="text-2xl font-bold mb-6 text-center">Choose Style & Format</h2>
               
@@ -361,8 +456,8 @@ const CreateStory = () => {
             </Card>
           )}
 
-          {/* Step 4: Generate */}
-          {currentStep === 4 && (
+          {/* Step 5/4: Generate */}
+          {currentStep === (formData.includePhoto ? 5 : 4) && (
             <Card className="p-8 bg-gradient-card text-center">
               <Sparkles className="h-16 w-16 mx-auto text-primary mb-6" />
               <h2 className="text-2xl font-bold mb-4">Ready to Create Magic!</h2>
@@ -406,7 +501,7 @@ const CreateStory = () => {
               Previous
             </Button>
             
-            {currentStep < 4 ? (
+            {currentStep < (formData.includePhoto ? 5 : 4) ? (
               <Button onClick={nextStep}>
                 Next
                 <ArrowRight className="ml-2 h-4 w-4" />
