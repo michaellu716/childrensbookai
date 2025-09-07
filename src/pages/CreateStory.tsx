@@ -110,15 +110,20 @@ const CreateStory = () => {
       console.error('Error creating character sheet:', error);
       
       // Handle rate limiting with retry logic
-      if (error.message?.includes('Too Many Requests') && retryCount < 2) {
-        const waitTime = (retryCount + 1) * 5000; // 5s, 10s
-        toast.error(`API rate limit reached. Retrying in ${waitTime/1000} seconds...`);
-        setTimeout(() => {
-          createCharacterSheet(retryCount + 1);
-        }, waitTime);
-        return;
-      } else if (error.message?.includes('Too Many Requests')) {
-        toast.error("OpenAI API is currently overloaded. You can skip the photo feature and continue without character customization.");
+      if (error.message?.includes('Too Many Requests') || error.message?.includes('rate limit')) {
+        if (retryCount < 1) {
+          const waitTime = 3000; // 3 seconds
+          toast.error(`API rate limit reached. Retrying in 3 seconds...`);
+          setTimeout(() => {
+            createCharacterSheet(retryCount + 1);
+          }, waitTime);
+          return;
+        } else {
+          // After 1 retry, automatically skip photo feature
+          toast.error("OpenAI API is overloaded. Automatically skipping photo feature so you can continue creating stories.");
+          skipPhotoFeature();
+          return;
+        }
       } else {
         toast.error(error.message || "Failed to create character. Please try again.");
       }
@@ -380,7 +385,7 @@ const CreateStory = () => {
               />
               
               {formData.photo && !characterSheet && (
-                <div className="mt-6 space-y-3">
+                <div className="mt-6 space-y-4">
                   <Button
                     onClick={() => createCharacterSheet()}
                     disabled={isCreatingCharacter}
@@ -392,18 +397,24 @@ const CreateStory = () => {
                       <>Create Cartoon Character</>
                     )}
                   </Button>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground mb-2">
+                  <div className="text-center space-y-3">
+                    <p className="text-xs text-muted-foreground">
                       This will analyze the photo and create cartoon versions
                     </p>
-                    <Button
-                      variant="outline"
-                      onClick={skipPhotoFeature}
-                      disabled={isCreatingCharacter}
-                      className="text-xs"
-                    >
-                      Skip Photo Feature
-                    </Button>
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <p className="text-sm font-medium mb-2">API Rate Limits?</p>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        If photo analysis fails, you can skip this feature and still create amazing stories!
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={skipPhotoFeature}
+                        disabled={isCreatingCharacter}
+                        className="w-full"
+                      >
+                        Skip Photo Feature & Continue
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
