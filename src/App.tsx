@@ -27,11 +27,7 @@ const App = () => (
               <Index />
             </AuthGuard>
           } />
-          <Route path="/landing" element={
-            <AuthGuard>
-              <Landing />
-            </AuthGuard>
-          } />
+          <Route path="/landing" element={<Landing />} />
           <Route path="/create" element={
             <AuthGuard>
               <CreateStory />
