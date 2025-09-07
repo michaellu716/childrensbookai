@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,29 @@ const CreateStory = () => {
     readingLevel: "toddler",
     language: "english"
   });
+
+  // Persist minimal wizard state (avoid storing large images)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('createStoryState');
+      if (saved) {
+        const state = JSON.parse(saved);
+        if (state.currentStep) setCurrentStep(state.currentStep);
+        if (state.formData) setFormData((prev) => ({ ...prev, ...state.formData, photo: null }));
+      }
+    } catch (e) {
+      console.warn('Failed to load saved state', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const { photo, ...safeForm } = formData;
+      localStorage.setItem('createStoryState', JSON.stringify({ currentStep, formData: safeForm }));
+    } catch (e) {
+      console.warn('Failed to save state', e);
+    }
+  }, [currentStep, formData]);
 
   const storyPresets = [
     { name: "Space Adventure", themes: ["space", "adventure", "friendship"] },
