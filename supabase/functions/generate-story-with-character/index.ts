@@ -57,7 +57,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -65,7 +65,7 @@ serve(async (req) => {
 
 Create a ${storySettings.length || 8}-page story based on the user's prompt. The main character is ${childName}, a ${childAge} year old child.
 
-Return the story as a JSON object with this structure:
+Return ONLY a valid JSON object with this exact structure:
 {
   "title": "Story Title",
   "pages": [
@@ -81,17 +81,15 @@ Return the story as a JSON object with this structure:
       "text": "Page text content",
       "sceneDescription": "Detailed scene description for illustration featuring ${childName}"
     }
-    // ... more pages
   ]
 }
 
-Requirements:
+IMPORTANT: 
+- Return ONLY the JSON object, no other text
 - Make ${childName} the main character in every scene
 - Age-appropriate for ${childAge} children
-- Include moral lessons and positive themes
 - Each page should have 1-3 sentences of text (keep it simple)
 - Scene descriptions should be detailed enough for consistent illustration
-- Vary the backgrounds and settings while keeping ${childName} as the focus
 - Reading level: ${storySettings.readingLevel || 'early reader'}`
           },
           {
@@ -99,8 +97,8 @@ Requirements:
             content: `Create a story based on this prompt: "${storyPrompt}". The main character is ${childName}.`
           }
         ],
-        max_completion_tokens: 2000,
-        
+        max_tokens: 2000,
+        temperature: 0.7
       }),
     });
 
@@ -239,7 +237,24 @@ Requirements:
 
   } catch (error) {
     console.error('Error in generate-story-with-character function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    
+    // Handle specific error types
+    let errorMessage = 'An unexpected error occurred while generating your story.';
+    
+    if (error.message?.includes('rate limit') || error.message?.includes('429')) {
+      errorMessage = 'OpenAI API rate limit reached. Please wait a few minutes and try again.';
+    } else if (error.message?.includes('JSON')) {
+      errorMessage = 'There was an issue processing the story content. Please try again.';
+    } else if (error.message?.includes('authentication')) {
+      errorMessage = 'Authentication error. Please sign in again.';
+    } else if (error.message?.includes('quota') || error.message?.includes('billing')) {
+      errorMessage = 'OpenAI API quota exceeded. Please check your billing settings.';
+    }
+    
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      details: error.message 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
