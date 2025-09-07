@@ -14,7 +14,231 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      character_sheets: {
+        Row: {
+          accessory: string | null
+          cartoon_reference_url: string | null
+          created_at: string | null
+          eye_color: string | null
+          hair_color: string | null
+          hair_style: string | null
+          id: string
+          name: string
+          photo_url: string | null
+          skin_tone: string | null
+          typical_outfit: string | null
+          user_id: string
+        }
+        Insert: {
+          accessory?: string | null
+          cartoon_reference_url?: string | null
+          created_at?: string | null
+          eye_color?: string | null
+          hair_color?: string | null
+          hair_style?: string | null
+          id?: string
+          name: string
+          photo_url?: string | null
+          skin_tone?: string | null
+          typical_outfit?: string | null
+          user_id: string
+        }
+        Update: {
+          accessory?: string | null
+          cartoon_reference_url?: string | null
+          created_at?: string | null
+          eye_color?: string | null
+          hair_color?: string | null
+          hair_style?: string | null
+          id?: string
+          name?: string
+          photo_url?: string | null
+          skin_tone?: string | null
+          typical_outfit?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      stories: {
+        Row: {
+          art_style: string | null
+          character_sheet_id: string | null
+          child_age: number | null
+          child_name: string | null
+          created_at: string | null
+          id: string
+          language: string | null
+          length: number | null
+          lesson: string | null
+          pdf_url: string | null
+          prompt: string
+          reading_level: string | null
+          share_url: string | null
+          status: string | null
+          themes: string[] | null
+          title: string
+          tone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          art_style?: string | null
+          character_sheet_id?: string | null
+          child_age?: number | null
+          child_name?: string | null
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          length?: number | null
+          lesson?: string | null
+          pdf_url?: string | null
+          prompt: string
+          reading_level?: string | null
+          share_url?: string | null
+          status?: string | null
+          themes?: string[] | null
+          title: string
+          tone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          art_style?: string | null
+          character_sheet_id?: string | null
+          child_age?: number | null
+          child_name?: string | null
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          length?: number | null
+          lesson?: string | null
+          pdf_url?: string | null
+          prompt?: string
+          reading_level?: string | null
+          share_url?: string | null
+          status?: string | null
+          themes?: string[] | null
+          title?: string
+          tone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stories_character_sheet_id_fkey"
+            columns: ["character_sheet_id"]
+            isOneToOne: false
+            referencedRelation: "character_sheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_generations: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          generation_type: string
+          id: string
+          status: string | null
+          story_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          generation_type: string
+          id?: string
+          status?: string | null
+          story_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          generation_type?: string
+          id?: string
+          status?: string | null
+          story_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_generations_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_pages: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_prompt: string | null
+          image_url: string | null
+          page_number: number
+          page_type: string | null
+          story_id: string
+          text_content: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          page_number: number
+          page_type?: string | null
+          story_id: string
+          text_content?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          page_number?: number
+          page_type?: string | null
+          story_id?: string
+          text_content?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_pages_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
