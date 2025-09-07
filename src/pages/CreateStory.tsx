@@ -112,24 +112,20 @@ const CreateStory = () => {
     } catch (error: any) {
       console.error('Error creating character sheet:', error);
       
-      // Handle rate limiting with retry logic
-      if (error.message?.includes('Too Many Requests') || error.message?.includes('rate limit')) {
-        if (retryCount < 1) {
-          const waitTime = 3000; // 3 seconds
-          toast.error(`API rate limit reached. Retrying in 3 seconds...`);
-          setTimeout(() => {
-            createCharacterSheet(retryCount + 1);
-          }, waitTime);
-          return;
-        } else {
-          // After 1 retry, automatically skip photo feature
-          toast.error("OpenAI API is overloaded. Automatically skipping photo feature so you can continue creating stories.");
-          skipPhotoFeature();
-          return;
-        }
+      // Handle rate limiting and API errors more gracefully
+      if (error.message?.includes('Too Many Requests') || 
+          error.message?.includes('rate limit') || 
+          error.message?.includes('insufficient_quota') ||
+          error.message?.includes('billing')) {
+        toast.error("OpenAI API limit reached. You need to add credits to your OpenAI account to use photo features.");
+        // Don't automatically skip, let user choose
+      } else if (error.message?.includes('Unexpected token')) {
+        toast.error("Character analysis failed. The AI response format was invalid.");
       } else {
-        toast.error(error.message || "Failed to create character. Please try again.");
+        toast.error(error.message || "Failed to create character. This might be due to OpenAI API limits.");
       }
+      
+      // Don't reset anything, just show the error and let user choose next action
     } finally {
       setIsCreatingCharacter(false);
     }
@@ -141,7 +137,8 @@ const CreateStory = () => {
     setCharacterSheet(null);
     setSelectedAvatarStyle(null);
     toast.success("Skipped photo feature. You can still create amazing stories!");
-    setCurrentStep(currentStep + 1);
+    // Skip to style & format step (step 3 when no photo)
+    setCurrentStep(3);
   };
 
   const handleAvatarStyleSelect = (style: any) => {
@@ -422,10 +419,10 @@ const CreateStory = () => {
                     <p className="text-xs text-muted-foreground">
                       This will analyze the photo and create cartoon versions
                     </p>
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <p className="text-sm font-medium mb-2">API Rate Limits?</p>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        If photo analysis fails, you can skip this feature and still create amazing stories!
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/20 dark:border-amber-800">
+                      <p className="text-sm font-medium mb-2 text-amber-800 dark:text-amber-200">⚠️ OpenAI API Required</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
+                        Photo features require OpenAI API credits. If you haven't added billing to your OpenAI account, this will fail.
                       </p>
                       <Button
                         variant="outline"
