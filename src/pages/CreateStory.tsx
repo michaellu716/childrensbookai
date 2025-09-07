@@ -186,7 +186,9 @@ const CreateStory = () => {
       return;
     }
 
-    if (formData.includePhoto && !selectedAvatarStyle) {
+    // Only require avatar selection if we have avatars available AND photo is included
+    const hasAvatars = (characterSheet?.generatedAvatars?.length || 0) > 0;
+    if (formData.includePhoto && hasAvatars && !selectedAvatarStyle) {
       toast.error("Please select an avatar style for your character");
       return;
     }
@@ -272,6 +274,10 @@ const CreateStory = () => {
       if (hasAvatars && !selectedAvatarStyle) {
         toast.error("Please select an avatar style");
         return;
+      }
+      // If no avatars, automatically proceed (skip the selection)
+      if (!hasAvatars) {
+        console.log('No avatars generated, proceeding without selection');
       }
     }
     
