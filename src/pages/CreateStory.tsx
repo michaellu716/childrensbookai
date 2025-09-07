@@ -176,6 +176,8 @@ const CreateStory = () => {
           characterSheet,
           selectedAvatarStyle,
           storySettings: {
+            childName: formData.childName,
+            childAge: formData.age,
             length: parseInt(formData.length),
             tone: formData.tone,
             themes: formData.themes,

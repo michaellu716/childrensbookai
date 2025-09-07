@@ -109,51 +109,60 @@ Requirements:
     
     console.log('Story generated, creating database records...');
 
-    // Save character sheet to database
-    const { data: savedCharacterSheet, error: characterError } = await supabase
-      .from('character_sheets')
-      .insert({
-        user_id: user.id,
-        name: characterSheet.name,
-        hair_color: characterSheet.hairColor,
-        hair_style: characterSheet.hairStyle,
-        eye_color: characterSheet.eyeColor,
-        skin_tone: characterSheet.skinTone,
-        typical_outfit: characterSheet.typicalOutfit,
-        accessory: characterSheet.accessory,
-        cartoon_reference_url: selectedAvatarStyle.imageUrl
-      })
-      .select()
-      .single();
+    let savedCharacterSheet = null;
+    
+    // Save character sheet to database only if we have one
+    if (characterSheet && selectedAvatarStyle) {
+      const { data, error: characterError } = await supabase
+        .from('character_sheets')
+        .insert({
+          user_id: user.id,
+          name: characterSheet.name,
+          hair_color: characterSheet.hairColor,
+          hair_style: characterSheet.hairStyle,
+          eye_color: characterSheet.eyeColor,
+          skin_tone: characterSheet.skinTone,
+          typical_outfit: characterSheet.typicalOutfit,
+          accessory: characterSheet.accessory,
+          cartoon_reference_url: selectedAvatarStyle.imageUrl
+        })
+        .select()
+        .maybeSingle();
 
-    if (characterError) {
-      throw new Error(`Failed to save character sheet: ${characterError.message}`);
+      if (characterError) {
+        throw new Error(`Failed to save character sheet: ${characterError.message}`);
+      }
+      savedCharacterSheet = data;
     }
+
+    // Extract child name from story settings or character sheet
+    const childName = characterSheet?.name || storySettings.childName || 'Child';
+    const childAge = characterSheet?.age || storySettings.childAge || null;
 
     // Save story to database
     const { data: savedStory, error: storyError } = await supabase
       .from('stories')
       .insert({
         user_id: user.id,
-        character_sheet_id: savedCharacterSheet.id,
+        character_sheet_id: savedCharacterSheet?.id || null,
         title: story.title,
         prompt: storyPrompt,
-        child_name: characterSheet.name,
-        child_age: characterSheet.age,
+        child_name: childName,
+        child_age: childAge,
         themes: storySettings.themes || [],
         lesson: storySettings.lesson,
         tone: storySettings.tone,
         length: storySettings.length || 8,
-        art_style: selectedAvatarStyle.style,
+        art_style: selectedAvatarStyle?.style || 'cartoon',
         reading_level: storySettings.readingLevel || 'early_reader',
         language: storySettings.language || 'en',
         status: 'generating'
       })
       .select()
-      .single();
+      .maybeSingle();
 
-    if (storyError) {
-      throw new Error(`Failed to save story: ${storyError.message}`);
+    if (storyError || !savedStory) {
+      throw new Error(`Failed to save story: ${storyError?.message || 'Unknown error'}`);
     }
 
     // Generate illustrations for each page in background
@@ -279,6 +288,12 @@ async function generateStoryIllustrations(
 }
 
 function createImagePrompt(sceneDescription: string, characterSheet: any, artStyle: string): string {
+  if (!characterSheet) {
+    return `${artStyle} illustration: ${sceneDescription}
+
+Style requirements: ${artStyle}, child-friendly, warm colors, storybook illustration, high quality, detailed background, appealing to children`;
+  }
+
   return `${artStyle} illustration: ${sceneDescription}
 
 Main character details (MUST be consistent):
