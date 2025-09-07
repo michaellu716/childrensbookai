@@ -107,6 +107,11 @@ Requirements:
     if (!storyResponse.ok) {
       const errorText = await storyResponse.text();
       console.error('Story generation failed:', storyResponse.status, errorText);
+      
+      if (storyResponse.status === 429) {
+        throw new Error('OpenAI API rate limit reached. Please wait a few minutes before trying again.');
+      }
+      
       throw new Error(`Story generation failed: ${storyResponse.statusText}`);
     }
 
@@ -114,7 +119,11 @@ Requirements:
     
     // Extract JSON content from markdown formatting if present
     let responseContent = storyData.choices[0].message.content;
-    console.log('Raw OpenAI response:', responseContent.substring(0, 200));
+    console.log('Raw OpenAI response (first 500 chars):', responseContent?.substring(0, 500));
+    
+    if (!responseContent) {
+      throw new Error('Empty response from OpenAI API');
+    }
     
     const jsonMatch = responseContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
@@ -122,7 +131,18 @@ Requirements:
       console.log('Extracted JSON from markdown');
     }
     
-    const story = JSON.parse(responseContent);
+    let story;
+    try {
+      story = JSON.parse(responseContent);
+    } catch (parseError) {
+      console.error('JSON parsing failed:', parseError);
+      console.error('Content that failed to parse:', responseContent);
+      throw new Error(`Failed to parse story JSON: ${parseError.message}. Raw content: ${responseContent?.substring(0, 200)}`);
+    }
+    
+    if (!story || !story.title || !story.pages) {
+      throw new Error(`Invalid story structure returned: ${JSON.stringify(story)}`);
+    }
     
     console.log('Story generated, creating database records...');
 
