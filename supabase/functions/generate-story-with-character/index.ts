@@ -319,12 +319,16 @@ async function generateStoryIllustrations(
       });
 
       if (!imageResponse.ok) {
-        console.error(`Failed to generate image for page ${page.pageNumber}:`, imageResponse.statusText);
+        const errorText = await imageResponse.text();
+        console.error(`Failed to generate image for page ${page.pageNumber}:`, imageResponse.status, errorText);
         continue;
       }
 
       const imageData = await imageResponse.json();
-      const imageUrl = `data:image/png;base64,${imageData.data[0].b64_json}`;
+      console.log(`Image response for page ${page.pageNumber}:`, JSON.stringify(imageData).substring(0, 200));
+      
+      // gpt-image-1 returns base64 directly in the response
+      const imageUrl = `data:image/png;base64,${imageData.data[0].b64_json || imageData.data[0]}`;;
 
       // Update story page with generated image
       const { error: updateError } = await supabase
