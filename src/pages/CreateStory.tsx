@@ -105,6 +105,12 @@ const CreateStory = () => {
       return;
     }
 
+    // Prevent multiple simultaneous calls
+    if (isCreatingCharacter) {
+      toast.error("Character creation already in progress");
+      return;
+    }
+
     setIsCreatingCharacter(true);
     
     try {
@@ -145,9 +151,9 @@ const CreateStory = () => {
       if (error.message?.includes('Too Many Requests') || 
           error.message?.includes('rate limit') || 
           error.message?.includes('insufficient_quota') ||
-          error.message?.includes('billing')) {
-        toast.error("OpenAI API limit reached. You need to add credits to your OpenAI account to use photo features.");
-        // Don't automatically skip, let user choose
+          error.message?.includes('billing') ||
+          error.message?.includes('429')) {
+        toast.error("OpenAI API rate limit reached. Please wait a few minutes before trying again, or skip the photo feature for now.");
       } else if (error.message?.includes('Unexpected token')) {
         toast.error("Character analysis failed. The AI response format was invalid.");
       } else {
@@ -182,6 +188,12 @@ const CreateStory = () => {
 
     if (formData.includePhoto && !selectedAvatarStyle) {
       toast.error("Please select an avatar style for your character");
+      return;
+    }
+
+    // Prevent multiple simultaneous calls
+    if (isGenerating) {
+      toast.error("Story generation already in progress");
       return;
     }
 
@@ -228,6 +240,10 @@ const CreateStory = () => {
       console.error('Error generating story:', error);
       if (error.message?.includes('not authenticated')) {
         toast.error("Authentication error. Please sign in again.");
+      } else if (error.message?.includes('Too Many Requests') || 
+                 error.message?.includes('rate limit') || 
+                 error.message?.includes('429')) {
+        toast.error("OpenAI API rate limit reached. Please wait a few minutes before trying again.");
       } else {
         toast.error(error.message || "Failed to generate story. Please try again.");
       }
