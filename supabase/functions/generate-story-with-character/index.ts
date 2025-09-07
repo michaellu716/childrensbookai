@@ -45,6 +45,10 @@ serve(async (req) => {
 
     console.log('Generating story content...');
 
+    // Extract child name and age before generating story
+    const childName = characterSheet?.name || storySettings.childName || 'Alex';
+    const childAge = characterSheet?.age || storySettings.childAge || 'young';
+
     // Generate story structure and text
     const storyResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -59,7 +63,7 @@ serve(async (req) => {
             role: 'system',
             content: `You are a children's book author who creates engaging, age-appropriate stories. 
 
-Create a ${storySettings.length || 8}-page story based on the user's prompt. The main character is ${characterSheet.name}, a ${characterSheet.age || 'young'} year old child.
+Create a ${storySettings.length || 8}-page story based on the user's prompt. The main character is ${childName}, a ${childAge} year old child.
 
 Return the story as a JSON object with this structure:
 {
@@ -69,30 +73,30 @@ Return the story as a JSON object with this structure:
       "pageNumber": 1,
       "pageType": "cover",
       "text": "Title and subtitle text",
-      "sceneDescription": "Cover illustration description with ${characterSheet.name}"
+      "sceneDescription": "Cover illustration description with ${childName}"
     },
     {
       "pageNumber": 2,
       "pageType": "story",
       "text": "Page text content",
-      "sceneDescription": "Detailed scene description for illustration featuring ${characterSheet.name}"
+      "sceneDescription": "Detailed scene description for illustration featuring ${childName}"
     }
     // ... more pages
   ]
 }
 
 Requirements:
-- Make ${characterSheet.name} the main character in every scene
-- Age-appropriate for ${characterSheet.age || 'young children'}
+- Make ${childName} the main character in every scene
+- Age-appropriate for ${childAge} children
 - Include moral lessons and positive themes
 - Each page should have 1-3 sentences of text (keep it simple)
 - Scene descriptions should be detailed enough for consistent illustration
-- Vary the backgrounds and settings while keeping ${characterSheet.name} as the focus
+- Vary the backgrounds and settings while keeping ${childName} as the focus
 - Reading level: ${storySettings.readingLevel || 'early reader'}`
           },
           {
             role: 'user',
-            content: `Create a story based on this prompt: "${storyPrompt}". The main character is ${characterSheet.name}.`
+            content: `Create a story based on this prompt: "${storyPrompt}". The main character is ${childName}.`
           }
         ],
         max_completion_tokens: 2000,
