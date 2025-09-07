@@ -224,10 +224,13 @@ const CreateStory = () => {
       }
     }
     
-    // Validate character selection
-    if (currentStep === 3 && formData.includePhoto && !selectedAvatarStyle) {
-      toast.error("Please select an avatar style");
-      return;
+    // Validate character selection. If no avatars were generated, allow skipping this step.
+    if (currentStep === 3 && formData.includePhoto) {
+      const hasAvatars = (characterSheet?.generatedAvatars?.length || 0) > 0;
+      if (hasAvatars && !selectedAvatarStyle) {
+        toast.error("Please select an avatar style");
+        return;
+      }
     }
     
     if (currentStep < (formData.includePhoto ? 5 : 4)) {
@@ -467,6 +470,9 @@ const CreateStory = () => {
                 selectedStyle={selectedAvatarStyle}
                 onStyleSelect={handleAvatarStyleSelect}
                 isLoading={isCreatingCharacter}
+                onBack={() => setCurrentStep(2)}
+                onRetry={() => createCharacterSheet()}
+                onSkip={skipPhotoFeature}
               />
             </Card>
           )}

@@ -11,16 +11,22 @@ interface AvatarStyle {
 
 interface AvatarStyleSelectorProps {
   avatarStyles: AvatarStyle[];
-  selectedStyle?: AvatarStyle;
+  selectedStyle?: AvatarStyle | null;
   onStyleSelect: (style: AvatarStyle) => void;
   isLoading?: boolean;
+  onBack?: () => void;
+  onSkip?: () => void;
+  onRetry?: () => void;
 }
 
 export const AvatarStyleSelector: React.FC<AvatarStyleSelectorProps> = ({
   avatarStyles,
   selectedStyle,
   onStyleSelect,
-  isLoading = false
+  isLoading = false,
+  onBack,
+  onSkip,
+  onRetry,
 }) => {
   // Debug logging
   console.log('AvatarStyleSelector props:', {
@@ -50,12 +56,17 @@ export const AvatarStyleSelector: React.FC<AvatarStyleSelectorProps> = ({
         <p className="text-muted-foreground mb-4">
           No avatar styles available. The image generation may have failed due to API limits.
         </p>
-        <p className="text-sm text-muted-foreground mb-4">
-          Debug info: Received {avatarStyles?.length || 0} avatar styles
-        </p>
-        <Button variant="outline" onClick={() => window.history.back()}>
-          Go Back to Create Character
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button variant="outline" onClick={onBack}>
+            Go Back to Create Character
+          </Button>
+          <Button variant="secondary" onClick={onRetry}>
+            Try Generating Styles Again
+          </Button>
+          <Button onClick={onSkip}>
+            Skip Photo Feature
+          </Button>
+        </div>
       </Card>
     );
   }
