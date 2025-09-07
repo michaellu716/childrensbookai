@@ -34,6 +34,21 @@ export const AvatarStyleSelector: React.FC<AvatarStyleSelectorProps> = ({
     );
   }
 
+  // Handle case when no avatar styles are available
+  if (!avatarStyles || avatarStyles.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <h3 className="text-lg font-semibold mb-2">Choose Your Child's Cartoon Style</h3>
+        <p className="text-muted-foreground mb-4">
+          No avatar styles available. Please go back and create character styles first.
+        </p>
+        <Button variant="outline" onClick={() => window.history.back()}>
+          Go Back to Create Character
+        </Button>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="text-center">
