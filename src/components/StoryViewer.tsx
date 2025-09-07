@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Download, Share2, Edit, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ChevronLeft, ChevronRight, Download, Share2, Edit, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -13,6 +14,14 @@ interface StoryPage {
   text_content: string;
   image_url?: string;
   image_prompt?: string;
+}
+
+interface StoryGeneration {
+  id: string;
+  generation_type: string;
+  status: string;
+  error_message?: string;
+  created_at: string;
 }
 
 interface Story {
@@ -32,9 +41,11 @@ interface StoryViewerProps {
 export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const [story, setStory] = useState<Story | null>(null);
   const [pages, setPages] = useState<StoryPage[]>([]);
+  const [generations, setGenerations] = useState<StoryGeneration[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
+  const [retryingIllustrations, setRetryingIllustrations] = useState(false);
 
   useEffect(() => {
     fetchStory();
@@ -86,8 +97,20 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         throw pagesError;
       }
 
+      // Fetch generation status and errors
+      const { data: generationsData, error: generationsError } = await supabase
+        .from('story_generations')
+        .select('*')
+        .eq('story_id', storyId)
+        .order('created_at', { ascending: false });
+
+      if (generationsError) {
+        console.error('Error fetching generations:', generationsError);
+      }
+
       setStory(storyData);
       setPages(pagesData || []);
+      setGenerations(generationsData || []);
       
       if (storyData.status !== 'generating') {
         setIsPolling(false);
@@ -116,6 +139,34 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const regeneratePage = async (pageId: string) => {
     toast.info('Regenerating page illustration...');
     // This would call an edge function to regenerate a single page
+  };
+
+  const retryIllustrations = async () => {
+    if (!story) return;
+    
+    setRetryingIllustrations(true);
+    try {
+      const response = await supabase.functions.invoke('retry-story-illustrations', {
+        body: { storyId: story.id }
+      });
+
+      if (response.error) {
+        console.error('Error retrying illustrations:', response.error);
+        toast.error('Failed to retry illustrations');
+      } else {
+        toast.success('Retrying illustrations...');
+        // Update story status to generating
+        setStory(prev => prev ? { ...prev, status: 'generating' } : null);
+        setIsPolling(true);
+        // Refetch to get updated data
+        fetchStory();
+      }
+    } catch (err) {
+      console.error('Error retrying illustrations:', err);
+      toast.error('Failed to retry illustrations');
+    } finally {
+      setRetryingIllustrations(false);
+    }
   };
 
   if (isLoading) {
@@ -158,15 +209,63 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   }
 
   if (story.status === 'failed') {
+    const latestError = generations.find(g => g.status === 'failed' && g.generation_type === 'illustrations');
+    
     return (
       <Card className="p-8 text-center">
+        <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
         <h3 className="text-xl font-semibold mb-2 text-destructive">Generation Failed</h3>
         <p className="text-muted-foreground mb-4">
-          We encountered an issue creating your story. Please try again.
+          We encountered an issue creating your story illustrations.
         </p>
-        <Button onClick={() => window.location.reload()}>
-          Try Again
-        </Button>
+        
+        {latestError?.error_message && (
+          <Alert className="mb-4 text-left">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Error details:</strong> {latestError.error_message}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex gap-3 justify-center">
+          <Button 
+            onClick={retryIllustrations}
+            disabled={retryingIllustrations}
+          >
+            {retryingIllustrations ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Retrying...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry Illustrations
+              </>
+            )}
+          </Button>
+          <Button variant="outline" onClick={() => window.location.href = '/create'}>
+            Create New Story
+          </Button>
+        </div>
+
+        {/* Show story text if available */}
+        {pages.length > 0 && (
+          <div className="mt-6">
+            <p className="text-sm text-muted-foreground mb-2">
+              Story text was generated successfully:
+            </p>
+            <h4 className="text-lg font-semibold mb-2">{story.title}</h4>
+            <div className="text-sm text-left bg-muted/50 p-3 rounded">
+              {pages.map((page, index) => (
+                <p key={page.id} className="mb-2">
+                  <strong>Page {page.page_number}:</strong> {page.text_content}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
     );
   }

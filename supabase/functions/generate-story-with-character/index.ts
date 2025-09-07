@@ -309,12 +309,12 @@ async function generateStoryIllustrations(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-image-1',
+          model: 'dall-e-3',
           prompt: imagePrompt,
           n: 1,
           size: '1024x1024',
-          quality: 'high',
-          output_format: 'png'
+          quality: 'standard',
+          response_format: 'b64_json'
         }),
       });
 
@@ -327,16 +327,8 @@ async function generateStoryIllustrations(
       const imageData = await imageResponse.json();
       console.log(`Image response for page ${page.pageNumber}:`, JSON.stringify(imageData).substring(0, 200));
       
-      // gpt-image-1 returns base64 directly in the response (no .data array structure)
-      let base64Data = '';
-      if (imageData.data && imageData.data.length > 0) {
-        // Legacy DALL-E format
-        base64Data = imageData.data[0].b64_json || imageData.data[0];
-      } else {
-        // gpt-image-1 format - base64 string directly in response
-        base64Data = imageData.b64_json || imageData;
-      }
-      
+      // DALL-E-3 returns base64 in b64_json format
+      const base64Data = imageData.data[0].b64_json;
       const imageUrl = `data:image/png;base64,${base64Data}`;
       console.log(`Generated image URL length for page ${page.pageNumber}:`, imageUrl.length);
 
@@ -388,6 +380,20 @@ async function generateStoryIllustrations(
     console.error('Error generating illustrations:', error);
     console.error('Error stack:', error.stack);
     console.error('Error details:', JSON.stringify(error, null, 2));
+    
+    // Save error to story_generations table
+    try {
+      await supabase
+        .from('story_generations')
+        .insert({
+          story_id: storyId,
+          generation_type: 'illustrations',
+          status: 'failed',
+          error_message: `Image generation failed: ${error.message || error}`
+        });
+    } catch (dbError) {
+      console.error('Failed to save generation error:', dbError);
+    }
     
     // Mark story as failed
     try {
