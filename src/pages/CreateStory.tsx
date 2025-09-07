@@ -98,12 +98,23 @@ const CreateStory = () => {
 
         setCharacterSheet(data.characterSheet);
         toast.success("Character styles created! Choose your favorite.");
+        
+        // Automatically move to next step after successful character creation
+        if (currentStep === 2) {
+          setCurrentStep(3);
+        }
       };
       
       reader.readAsDataURL(formData.photo);
     } catch (error: any) {
       console.error('Error creating character sheet:', error);
-      toast.error(error.message || "Failed to create character. Please try again.");
+      
+      // Handle rate limiting specifically
+      if (error.message?.includes('Too Many Requests')) {
+        toast.error("OpenAI API rate limit reached. Please try again in a few minutes.");
+      } else {
+        toast.error(error.message || "Failed to create character. Please try again.");
+      }
     } finally {
       setIsCreatingCharacter(false);
     }
@@ -166,10 +177,12 @@ const CreateStory = () => {
       return;
     }
     
-    // Handle photo upload to character creation
-    if (currentStep === 2 && formData.includePhoto && formData.photo && !characterSheet) {
-      await createCharacterSheet();
-      return;
+    // Handle photo upload step
+    if (currentStep === 2 && formData.includePhoto && formData.photo) {
+      if (!characterSheet) {
+        await createCharacterSheet();
+        return;
+      }
     }
     
     // Validate character selection
@@ -363,6 +376,17 @@ const CreateStory = () => {
                       <>Create Cartoon Character</>
                     )}
                   </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    This will analyze the photo and create cartoon versions
+                  </p>
+                </div>
+              )}
+              
+              {characterSheet && (
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-success font-medium mb-2">
+                    ✓ Character styles created! You can now proceed to the next step.
+                  </p>
                 </div>
               )}
             </Card>
