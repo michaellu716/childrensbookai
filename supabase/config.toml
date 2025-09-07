@@ -1,7 +1,7 @@
 project_id = "jhcbvppqhmedikzuwats"
 
 [functions.create-character-sheet]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-story-with-character]
-verify_jwt = false
+verify_jwt = true

@@ -159,6 +159,15 @@ const CreateStory = () => {
     setIsGenerating(true);
     
     try {
+      // Get the current session to ensure we have valid auth
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast.error("Authentication required. Please sign in again.");
+        setIsGenerating(false);
+        return;
+      }
+
       const storyPrompt = `Create a ${formData.tone} story for ${formData.childName} (age ${formData.age}) featuring themes: ${formData.themes.join(", ")}. ${formData.lesson ? `Include the lesson: ${formData.lesson}.` : ""}`;
       
       const { data, error } = await supabase.functions.invoke('generate-story-with-character', {
@@ -186,7 +195,11 @@ const CreateStory = () => {
       
     } catch (error: any) {
       console.error('Error generating story:', error);
-      toast.error(error.message || "Failed to generate story. Please try again.");
+      if (error.message?.includes('not authenticated')) {
+        toast.error("Authentication error. Please sign in again.");
+      } else {
+        toast.error(error.message || "Failed to generate story. Please try again.");
+      }
       setIsGenerating(false);
     }
   };

@@ -29,25 +29,18 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get authorization header
+    // Get user from JWT (automatically handled by verify_jwt = true)
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
+    const token = authHeader?.replace('Bearer ', '');
+    
+    if (!token) {
+      throw new Error('No authentication token provided');
     }
 
-    // Create supabase client with user's token
-    const userSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-    });
-
-    // Get user
-    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
+    // Verify token and get user
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
-      throw new Error('User not authenticated');
+      throw new Error('Invalid authentication token');
     }
 
     console.log('Generating story content...');
@@ -117,7 +110,7 @@ Requirements:
     console.log('Story generated, creating database records...');
 
     // Save character sheet to database
-    const { data: savedCharacterSheet, error: characterError } = await userSupabase
+    const { data: savedCharacterSheet, error: characterError } = await supabase
       .from('character_sheets')
       .insert({
         user_id: user.id,
@@ -138,7 +131,7 @@ Requirements:
     }
 
     // Save story to database
-    const { data: savedStory, error: storyError } = await userSupabase
+    const { data: savedStory, error: storyError } = await supabase
       .from('stories')
       .insert({
         user_id: user.id,
@@ -172,7 +165,7 @@ Requirements:
       story.pages, 
       characterSheet, 
       selectedAvatarStyle,
-      userSupabase
+      supabase
     ));
 
     // Save story pages (text only initially)
@@ -184,7 +177,7 @@ Requirements:
       image_prompt: createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle.style)
     }));
 
-    const { error: pagesError } = await userSupabase
+    const { error: pagesError } = await supabase
       .from('story_pages')
       .insert(pageInserts);
 
