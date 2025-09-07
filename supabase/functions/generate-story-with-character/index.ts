@@ -357,23 +357,31 @@ async function generateStoryIllustrations(
       }
     }
 
-    // Mark story as completed
-    await supabase
-      .from('stories')
-      .update({ status: 'completed' })
-      .eq('id', storyId);
-
-    console.log(`Story ${storyId} illustrations completed successfully`);
-    
-    // Verify all pages have images
-    const { data: pagesCheck } = await supabase
+    // After attempting all pages, verify completion
+    const { data: missingPages, error: checkError } = await supabase
       .from('story_pages')
-      .select('page_number, image_url')
+      .select('page_number')
       .eq('story_id', storyId)
       .is('image_url', null);
-    
-    if (pagesCheck && pagesCheck.length > 0) {
-      console.warn(`Warning: ${pagesCheck.length} pages still missing images for story ${storyId}`);
+
+    if (checkError) {
+      console.error('Failed to verify missing pages:', checkError);
+    }
+
+    if (!missingPages || missingPages.length === 0) {
+      // All good -> mark story as completed
+      await supabase
+        .from('stories')
+        .update({ status: 'completed' })
+        .eq('id', storyId);
+      console.log(`Story ${storyId} illustrations completed successfully`);
+    } else {
+      // Some pages failed -> mark as failed so UI can prompt retry
+      await supabase
+        .from('stories')
+        .update({ status: 'failed' })
+        .eq('id', storyId);
+      console.warn(`Story ${storyId} has ${missingPages.length} pages without images. Marked as failed.`);
     }
 
   } catch (error) {
