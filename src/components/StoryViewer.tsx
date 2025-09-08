@@ -70,21 +70,10 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     isFetchingRef.current = true;
 
     try {
-      // Fetch story details (use maybeSingle to avoid throwing when missing)
+      // Fetch story details (simplified query to avoid timeout issues)
       const { data: storyData, error: storyError } = await supabase
         .from('stories')
-        .select(`
-          *,
-          character_sheets (
-            name,
-            hair_color,
-            hair_style,
-            eye_color,
-            skin_tone,
-            typical_outfit,
-            cartoon_reference_url
-          )
-        `)
+        .select('*')
         .eq('id', storyId)
         .maybeSingle();
 
@@ -106,10 +95,21 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         return;
       }
 
-      // Fetch story pages
+      // Fetch character sheet separately if needed (only if character_sheet_id exists)
+      let characterSheet = null;
+      if (storyData.character_sheet_id) {
+        const { data: characterData } = await supabase
+          .from('character_sheets')
+          .select('name, hair_color, hair_style, eye_color, skin_tone, typical_outfit, cartoon_reference_url')
+          .eq('id', storyData.character_sheet_id)
+          .maybeSingle();
+        characterSheet = characterData;
+      }
+
+      // Fetch story pages (simplified query)
       const { data: pagesData, error: pagesError } = await supabase
         .from('story_pages')
-        .select('*')
+        .select('id, page_number, page_type, text_content, image_url, image_prompt')
         .eq('story_id', storyId)
         .order('page_number');
 
@@ -117,10 +117,10 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         throw pagesError;
       }
 
-      // Fetch generation status and errors
+      // Fetch generation status and errors (simplified query)
       const { data: generationsData, error: generationsError } = await supabase
         .from('story_generations')
-        .select('*')
+        .select('id, generation_type, status, error_message, created_at')
         .eq('story_id', storyId)
         .order('created_at', { ascending: false });
 
@@ -128,12 +128,17 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         console.error('Error fetching generations:', generationsError);
       }
 
-      setStory(storyData);
+      // Attach character sheet to story data
+      const storyWithCharacter = characterSheet 
+        ? { ...storyData, character_sheets: characterSheet }
+        : { ...storyData, character_sheets: null };
+
+      setStory(storyWithCharacter);
       setPages(pagesData || []);
       setGenerations(generationsData || []);
 
       // Polling control
-      if (storyData.status === 'generating') {
+      if (storyWithCharacter.status === 'generating') {
         setIsPolling(true);
         if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
         pollTimeoutRef.current = window.setTimeout(() => {
@@ -153,18 +158,21 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     } catch (error: any) {
       // Handle transient timeouts by retrying without flipping to "not found"
       const msg = String(error?.message || error?.code || 'unknown');
-      const isTransient = msg.includes('timeout') || msg.includes('57014');
+      const isTransient = msg.includes('timeout') || msg.includes('57014') || msg.includes('statement timeout');
 
       console.error('Error fetching story:', error);
 
-      if (isTransient) {
-        // Keep loading state and schedule a retry
+      if (isTransient && !isMountedRef.current === false) {
+        // Keep loading state and schedule a retry with exponential backoff
         setIsPolling(true);
         if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+        
+        // Exponential backoff: increase delay for repeated failures
+        const retryDelay = Math.min(POLL_INTERVAL * 2, 15000); // Max 15 seconds
         pollTimeoutRef.current = window.setTimeout(() => {
           if (!isMountedRef.current) return;
           fetchStory();
-        }, POLL_INTERVAL);
+        }, retryDelay);
       } else {
         // Non-retryable error: stop loading and show toast
         setIsPolling(false);
