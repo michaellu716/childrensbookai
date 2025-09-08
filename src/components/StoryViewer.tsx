@@ -39,6 +39,63 @@ interface StoryViewerProps {
   storyId: string;
 }
 
+// Lazy loading image component
+const LazyImage: React.FC<{ 
+  pageId: string; 
+  loadImage: (pageId: string) => Promise<string | null>; 
+  isLoading: boolean;
+  alt?: string;
+}> = ({ pageId, loadImage, isLoading, alt = "Story page" }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      setImageLoading(true);
+      setImageError(false);
+      try {
+        const url = await loadImage(pageId);
+        setImageUrl(url);
+        if (!url) setImageError(true);
+      } catch (error) {
+        console.error('Error loading image:', error);
+        setImageError(true);
+      } finally {
+        setImageLoading(false);
+      }
+    };
+
+    load();
+  }, [pageId, loadImage]);
+
+  if (imageLoading || isLoading) {
+    return (
+      <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (imageError || !imageUrl) {
+    return (
+      <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center">
+        <AlertCircle className="h-8 w-8 text-muted-foreground" />
+        <span className="ml-2 text-sm text-muted-foreground">Image not available</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={alt}
+      className="w-full aspect-video object-cover rounded-lg"
+      onError={() => setImageError(true)}
+    />
+  );
+};
+
 export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const [story, setStory] = useState<Story | null>(null);
   const [pages, setPages] = useState<StoryPage[]>([]);
@@ -53,6 +110,10 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Image loading state
+  const [imageCache, setImageCache] = useState<Record<string, string>>({});
+  const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
 
   const POLL_INTERVAL = 5000;
   const pollTimeoutRef = useRef<number | null>(null);
@@ -381,6 +442,43 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     }
   };
 
+  // Lazy load image for a specific page
+  const loadPageImage = async (pageId: string) => {
+    // Check if already cached or loading
+    if (imageCache[pageId] || loadingImages.has(pageId)) {
+      return imageCache[pageId] || null;
+    }
+
+    setLoadingImages(prev => new Set(prev).add(pageId));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('get-page-image', {
+        body: { pageId }
+      });
+
+      if (error) {
+        console.warn('Error loading page image:', error);
+        return null;
+      }
+
+      const imageUrl = data?.image_url;
+      if (imageUrl) {
+        setImageCache(prev => ({ ...prev, [pageId]: imageUrl }));
+        return imageUrl;
+      }
+      return null;
+    } catch (error) {
+      console.warn('Failed to load page image:', error);
+      return null;
+    } finally {
+      setLoadingImages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(pageId);
+        return newSet;
+      });
+    }
+  };
+
   const startEditing = (pageId: string, currentText: string | null | undefined) => {
     console.log('[StoryViewer] Start editing page', { pageId });
     setEditingPageId(pageId);
@@ -614,22 +712,12 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
       {currentPageData && (
         <Card className="overflow-hidden">
           <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-secondary/10 relative">
-            {currentPageData.image_url ? (
-              <img
-                src={currentPageData.image_url}
-                alt={`Page ${currentPageData.page_number}`}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
-                  <p className="text-sm text-muted-foreground">
-                    Generating illustration...
-                  </p>
-                </div>
-              </div>
-            )}
+            <LazyImage
+              pageId={currentPageData.id}
+              loadImage={loadPageImage}
+              isLoading={loadingImages.has(currentPageData.id)}
+              alt={`Page ${currentPageData.page_number}`}
+            />
             
             {/* Page Number Indicator */}
             <div className="absolute top-4 right-4 bg-black/60 text-white px-2 py-1 rounded">
