@@ -46,6 +46,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
   const [retryingIllustrations, setRetryingIllustrations] = useState(false);
+  const [completedCount, setCompletedCount] = useState<number>(0);
+  const [totalCount, setTotalCount] = useState<number>(0);
 
   const POLL_INTERVAL = 5000;
   const pollTimeoutRef = useRef<number | null>(null);
@@ -208,6 +210,25 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
       setPages(pagesData);
       setGenerations(generationsData);
 
+      // Update progress counts (lightweight HEAD count for accuracy during generation)
+      try {
+        const estimatedTotal = Number(storyWithCharacter.length || pagesData.length || 0);
+        setTotalCount(estimatedTotal);
+
+        const { count: headCompleted } = await supabase
+          .from('story_pages')
+          .select('id', { count: 'exact', head: true })
+          .eq('story_id', storyId)
+          .not('image_url', 'is', null);
+
+        const fallbackCompleted = pagesData.filter(p => !!p.image_url).length;
+        setCompletedCount(typeof headCompleted === 'number' ? headCompleted : fallbackCompleted);
+      } catch (e) {
+        console.warn('Count query failed, using fallback:', e);
+        setCompletedCount(pagesData.filter(p => !!p.image_url).length);
+        setTotalCount(Number(storyWithCharacter.length || pagesData.length || 0));
+      }
+
       // Polling control
       if (storyWithCharacter.status === 'generating') {
         setIsPolling(true);
@@ -331,7 +352,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         </p>
         <div className="bg-muted/50 rounded-lg p-4">
           <p className="text-sm">
-            {pages.filter(p => p.image_url).length} of {pages.length} pages completed
+            {completedCount} of {totalCount} pages completed
           </p>
         </div>
         {isPolling && (
