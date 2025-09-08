@@ -70,7 +70,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     isFetchingRef.current = true;
 
     try {
-      // Fetch story details
+      // Fetch story details (use maybeSingle to avoid throwing when missing)
       const { data: storyData, error: storyError } = await supabase
         .from('stories')
         .select(`
@@ -86,10 +86,24 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
           )
         `)
         .eq('id', storyId)
-        .single();
+        .maybeSingle();
 
       if (storyError) {
         throw storyError;
+      }
+
+      if (!storyData) {
+        // Not found
+        setStory(null);
+        setPages([]);
+        setGenerations([]);
+        setIsPolling(false);
+        if (pollTimeoutRef.current) {
+          clearTimeout(pollTimeoutRef.current);
+          pollTimeoutRef.current = null;
+        }
+        setIsLoading(false);
+        return;
       }
 
       // Fetch story pages
@@ -134,11 +148,34 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         }
       }
 
-    } catch (error: any) {
-      console.error('Error fetching story:', error);
-      toast.error('Failed to load story');
-    } finally {
       setIsLoading(false);
+
+    } catch (error: any) {
+      // Handle transient timeouts by retrying without flipping to "not found"
+      const msg = String(error?.message || error?.code || 'unknown');
+      const isTransient = msg.includes('timeout') || msg.includes('57014');
+
+      console.error('Error fetching story:', error);
+
+      if (isTransient) {
+        // Keep loading state and schedule a retry
+        setIsPolling(true);
+        if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = window.setTimeout(() => {
+          if (!isMountedRef.current) return;
+          fetchStory();
+        }, POLL_INTERVAL);
+      } else {
+        // Non-retryable error: stop loading and show toast
+        setIsPolling(false);
+        if (pollTimeoutRef.current) {
+          clearTimeout(pollTimeoutRef.current);
+          pollTimeoutRef.current = null;
+        }
+        setIsLoading(false);
+        toast.error('Failed to load story');
+      }
+    } finally {
       isFetchingRef.current = false;
     }
   };
