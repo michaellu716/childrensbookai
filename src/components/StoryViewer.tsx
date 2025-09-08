@@ -65,7 +65,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     };
   }, []);
 
-  const fetchStory = async () => {
+  const fetchStory = async (retryCount = 0) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
@@ -98,34 +98,60 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
       // Fetch character sheet separately if needed (only if character_sheet_id exists)
       let characterSheet = null;
       if (storyData.character_sheet_id) {
-        const { data: characterData } = await supabase
-          .from('character_sheets')
-          .select('name, hair_color, hair_style, eye_color, skin_tone, typical_outfit, cartoon_reference_url')
-          .eq('id', storyData.character_sheet_id)
-          .maybeSingle();
-        characterSheet = characterData;
+        try {
+          const { data: characterData } = await supabase
+            .from('character_sheets')
+            .select('name, hair_color, hair_style, eye_color, skin_tone, typical_outfit, cartoon_reference_url')
+            .eq('id', storyData.character_sheet_id)
+            .maybeSingle();
+          characterSheet = characterData;
+        } catch (err) {
+          console.warn('Failed to fetch character sheet:', err);
+        }
       }
 
-      // Fetch story pages (simplified query)
-      const { data: pagesData, error: pagesError } = await supabase
-        .from('story_pages')
-        .select('id, page_number, page_type, text_content, image_url, image_prompt')
-        .eq('story_id', storyId)
-        .order('page_number');
+      // Fetch story pages with retry on network errors
+      let pagesData = [];
+      try {
+        const { data, error: pagesError } = await supabase
+          .from('story_pages')
+          .select('id, page_number, page_type, text_content, image_url, image_prompt')
+          .eq('story_id', storyId)
+          .order('page_number');
 
-      if (pagesError) {
-        throw pagesError;
+        if (pagesError) {
+          throw pagesError;
+        }
+        pagesData = data || [];
+      } catch (err) {
+        if (retryCount < 2 && (String(err.message).includes('Failed to fetch') || String(err.message).includes('QUIC'))) {
+          // Network retry for pages
+          console.log(`Retrying pages fetch (attempt ${retryCount + 1})`);
+          setTimeout(() => {
+            if (!isMountedRef.current) return;
+            fetchStory(retryCount + 1);
+          }, 1000 * (retryCount + 1));
+          return;
+        }
+        throw err;
       }
 
       // Fetch generation status and errors (simplified query)
-      const { data: generationsData, error: generationsError } = await supabase
-        .from('story_generations')
-        .select('id, generation_type, status, error_message, created_at')
-        .eq('story_id', storyId)
-        .order('created_at', { ascending: false });
+      let generationsData = [];
+      try {
+        const { data, error: generationsError } = await supabase
+          .from('story_generations')
+          .select('id, generation_type, status, error_message, created_at')
+          .eq('story_id', storyId)
+          .order('created_at', { ascending: false });
 
-      if (generationsError) {
-        console.error('Error fetching generations:', generationsError);
+        if (generationsError) {
+          console.error('Error fetching generations:', generationsError);
+        } else {
+          generationsData = data || [];
+        }
+      } catch (err) {
+        console.warn('Failed to fetch generations:', err);
       }
 
       // Attach character sheet to story data
@@ -134,8 +160,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         : { ...storyData, character_sheets: null };
 
       setStory(storyWithCharacter);
-      setPages(pagesData || []);
-      setGenerations(generationsData || []);
+      setPages(pagesData);
+      setGenerations(generationsData);
 
       // Polling control
       if (storyWithCharacter.status === 'generating') {
@@ -156,32 +182,38 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
       setIsLoading(false);
 
     } catch (error: any) {
-      // Handle transient timeouts by retrying without flipping to "not found"
+      // Handle transient network and timeout errors
       const msg = String(error?.message || error?.code || 'unknown');
-      const isTransient = msg.includes('timeout') || msg.includes('57014') || msg.includes('statement timeout');
+      const isTransient = msg.includes('timeout') || 
+                         msg.includes('57014') || 
+                         msg.includes('statement timeout') ||
+                         msg.includes('Failed to fetch') ||
+                         msg.includes('QUIC') ||
+                         msg.includes('network');
 
       console.error('Error fetching story:', error);
 
-      if (isTransient && !isMountedRef.current === false) {
-        // Keep loading state and schedule a retry with exponential backoff
+      if (isTransient && retryCount < 3 && isMountedRef.current) {
+        // Network retry with exponential backoff
         setIsPolling(true);
         if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
         
-        // Exponential backoff: increase delay for repeated failures
-        const retryDelay = Math.min(POLL_INTERVAL * 2, 15000); // Max 15 seconds
+        const retryDelay = Math.min(2000 * Math.pow(2, retryCount), 10000); // 2s, 4s, 8s max
+        console.log(`Retrying story fetch in ${retryDelay}ms (attempt ${retryCount + 1})`);
+        
         pollTimeoutRef.current = window.setTimeout(() => {
           if (!isMountedRef.current) return;
-          fetchStory();
+          fetchStory(retryCount + 1);
         }, retryDelay);
       } else {
-        // Non-retryable error: stop loading and show toast
+        // Non-retryable error or max retries reached: stop loading and show toast
         setIsPolling(false);
         if (pollTimeoutRef.current) {
           clearTimeout(pollTimeoutRef.current);
           pollTimeoutRef.current = null;
         }
         setIsLoading(false);
-        toast.error('Failed to load story');
+        toast.error('Network error loading story. Please check your connection and try again.');
       }
     } finally {
       isFetchingRef.current = false;
