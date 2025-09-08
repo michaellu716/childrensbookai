@@ -48,6 +48,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const [retryingIllustrations, setRetryingIllustrations] = useState(false);
   const [completedCount, setCompletedCount] = useState<number>(0);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
 
   const POLL_INTERVAL = 5000;
   const pollTimeoutRef = useRef<number | null>(null);
@@ -370,6 +371,42 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!story) return;
+    
+    setIsDownloadingPDF(true);
+    try {
+      const response = await supabase.functions.invoke('generate-story-pdf', {
+        body: { storyId: story.id }
+      });
+
+      if (response.error) {
+        console.error('Error generating PDF:', response.error);
+        toast.error('Failed to generate PDF');
+      } else if (response.data?.pdfUrl) {
+        // Download the PDF
+        const link = document.createElement('a');
+        link.href = response.data.pdfUrl;
+        link.download = response.data.filename || `${story.title}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('PDF downloaded successfully!');
+      }
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+      toast.error('Failed to download PDF');
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
+
+  const handleShare = () => {
+    const shareUrl = window.location.href;
+    navigator.clipboard.writeText(shareUrl);
+    toast.success('Share link copied to clipboard!');
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -568,11 +605,15 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
 
       {/* Action Buttons */}
       <div className="flex justify-center gap-4">
-        <Button variant="outline">
-          <Download className="h-4 w-4 mr-2" />
+        <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
+          {isDownloadingPDF ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
           Download PDF
         </Button>
-        <Button variant="outline">
+        <Button variant="outline" onClick={handleShare}>
           <Share2 className="h-4 w-4 mr-2" />
           Share Story
         </Button>
