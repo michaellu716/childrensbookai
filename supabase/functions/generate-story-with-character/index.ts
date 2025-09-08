@@ -63,7 +63,7 @@ serve(async (req) => {
             role: 'system',
             content: `You are a children's book author who creates engaging, age-appropriate stories. 
 
-Create a ${storySettings.length || 8}-page story based on the user's prompt. The main character is ${childName}, a ${childAge} year old child.
+Create a ${storySettings.length || 2}-page story based on the user's prompt. The main character is ${childName}, a ${childAge} year old child.
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -136,7 +136,7 @@ IMPORTANT:
       console.error('JSON parsing failed:', parseError);
       console.error('Content that failed to parse:', responseContent);
       // Fallback: create a minimal valid story so the user can proceed
-      const length = Number(storySettings.length || 8);
+      const length = Number(storySettings.length || 2);
       story = {
         title: `The Adventures of ${childName}`,
         pages: Array.from({ length }, (_, i) => ({
@@ -155,7 +155,7 @@ IMPORTANT:
     
     if (!story || !story.title || !story.pages) {
       // As a final safeguard, create a minimal valid story
-      const length = Number(storySettings.length || 8);
+      const length = Number(storySettings.length || 2);
       story = {
         title: `A Story for ${childName}`,
         pages: Array.from({ length }, (_, i) => ({
@@ -210,7 +210,7 @@ IMPORTANT:
         themes: storySettings.themes || [],
         lesson: storySettings.lesson,
         tone: storySettings.tone,
-        length: storySettings.length || 8,
+        length: storySettings.length || 2,
         art_style: selectedAvatarStyle?.style || 'cartoon',
         reading_level: storySettings.readingLevel || 'early_reader',
         language: storySettings.language || 'en',

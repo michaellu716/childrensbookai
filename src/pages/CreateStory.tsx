@@ -29,7 +29,7 @@ const CreateStory = () => {
     themes: [] as string[],
     lesson: "",
     tone: "gentle",
-    length: "8",
+    length: "2",
     photo: null as File | null,
     includePhoto: false,
     artStyle: "cartoon",
