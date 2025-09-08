@@ -76,9 +76,11 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
 
       // Try edge function first to reduce roundtrips and avoid transient CORS/network hiccups
       try {
+        console.log('Calling get-story-details function with storyId:', storyId);
         const { data: fnData, error: fnError } = await supabase.functions.invoke('get-story-details', {
           body: { storyId }
         });
+        console.log('Edge function response:', { fnData, fnError });
         if (!fnError && fnData && (fnData as any).story) {
           const s = (fnData as any).story as any;
           const p = ((fnData as any).pages || []) as any[];

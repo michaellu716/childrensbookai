@@ -8,13 +8,17 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('get-story-details: Request received', { method: req.method, url: req.url });
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { storyId } = await req.json();
+    const body = await req.json();
+    console.log('get-story-details: Request body:', body);
+    const { storyId } = body;
     if (!storyId) {
       return new Response(JSON.stringify({ error: "Missing storyId" }), {
         status: 400,
