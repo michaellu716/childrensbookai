@@ -89,6 +89,7 @@ IMPORTANT:
 - Make ${childName} the main character in every scene
 - Age-appropriate for ${childAge} children
 - Each page should have exactly 3 sentences of text for better storytelling flow
+- The FINAL page should end with "The End" to properly conclude the story
 - Create engaging, descriptive text that tells a complete story moment
 - Scene descriptions should be detailed enough for consistent illustration
 - Reading level: ${storySettings.readingLevel || 'early reader'}`
