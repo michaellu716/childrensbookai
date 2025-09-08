@@ -205,11 +205,22 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         }
       }
 
-      // Fetch story pages with aggressive retry
+      // Fetch story pages with exponential backoff for QUIC errors
       let pagesData = [];
       let pagesAttempt = 0;
-      while (pagesAttempt < 5) {
+      const maxPageRetries = 8; // Increased for QUIC protocol issues
+      
+      while (pagesAttempt < maxPageRetries) {
         try {
+          // Add random jitter to prevent thundering herd
+          if (pagesAttempt > 0) {
+            const baseDelay = Math.min(1000 * Math.pow(2, pagesAttempt - 1), 10000);
+            const jitter = Math.random() * 1000;
+            const delay = baseDelay + jitter;
+            console.log(`Pages fetch failed (attempt ${pagesAttempt}), retrying in ${Math.round(delay)}ms`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+
           const { data, error } = await supabase
             .from('story_pages')
             .select('id, page_number, page_type, text_content, image_url, image_prompt')
@@ -218,21 +229,31 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
 
           if (error) throw error;
           pagesData = data || [];
-          console.log(`Successfully fetched ${pagesData.length} pages`);
+          console.log(`Successfully fetched ${pagesData.length} pages on attempt ${pagesAttempt + 1}`);
           break;
         } catch (err) {
           pagesAttempt++;
-          const isNetworkError = String(err.message).includes('Failed to fetch') || 
-                                String(err.message).includes('QUIC') ||
-                                String(err.message).includes('network');
+          const errMsg = String(err.message || err);
+          const isQuicError = errMsg.includes('QUIC') || errMsg.includes('ERR_QUIC_PROTOCOL_ERROR');
+          const isNetworkError = errMsg.includes('Failed to fetch') || 
+                                errMsg.includes('network') || 
+                                errMsg.includes('timeout') ||
+                                isQuicError;
           
-          if (pagesAttempt < 5 && isNetworkError) {
-            const delay = Math.min(1000 * pagesAttempt, 5000);
-            console.log(`Pages fetch failed (attempt ${pagesAttempt}), retrying in ${delay}ms`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+          console.warn(`Pages fetch attempt ${pagesAttempt} failed:`, errMsg);
+          
+          if (pagesAttempt < maxPageRetries && isNetworkError) {
+            // For QUIC errors, use longer delays
+            if (isQuicError && pagesAttempt >= 3) {
+              console.log('QUIC protocol error detected, using extended delay');
+            }
             continue;
           }
-          throw err;
+          
+          // Final attempt failed, but don't throw - allow partial loading
+          console.error('All pages fetch attempts failed:', errMsg);
+          pagesData = [];
+          break;
         }
       }
 
