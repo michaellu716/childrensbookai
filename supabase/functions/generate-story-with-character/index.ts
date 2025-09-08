@@ -378,20 +378,29 @@ async function generateStoryIllustrations(
       console.error('Failed to verify missing pages:', checkError);
     }
 
-    if (!missingPages || missingPages.length === 0) {
-      // All good -> mark story as completed
+    const totalPages = pages.length;
+    const failedPages = missingPages?.length || 0;
+    const successRate = ((totalPages - failedPages) / totalPages) * 100;
+    
+    // Mark as completed if at least 75% of illustrations succeeded
+    if (successRate >= 75) {
       await supabase
         .from('stories')
         .update({ status: 'completed' })
         .eq('id', storyId);
-      console.log(`Story ${storyId} illustrations completed successfully`);
+      
+      if (failedPages > 0) {
+        console.log(`Story ${storyId} completed with ${failedPages} failed illustrations (${successRate.toFixed(1)}% success rate)`);
+      } else {
+        console.log(`Story ${storyId} illustrations completed successfully`);
+      }
     } else {
-      // Some pages failed -> mark as failed so UI can prompt retry
+      // Mark as failed only if success rate is below 75%
       await supabase
         .from('stories')
         .update({ status: 'failed' })
         .eq('id', storyId);
-      console.warn(`Story ${storyId} has ${missingPages.length} pages without images. Marked as failed.`);
+      console.warn(`Story ${storyId} marked as failed - only ${successRate.toFixed(1)}% success rate (${failedPages}/${totalPages} pages failed)`);
     }
 
   } catch (error) {
@@ -427,23 +436,29 @@ async function generateStoryIllustrations(
 }
 
 function createImagePrompt(sceneDescription: string, characterSheet: any, artStyle: string): string {
-  if (!characterSheet) {
-    return `${artStyle} illustration: ${sceneDescription}
+  // Sanitize scene description to avoid safety system triggers
+  const safeSceneDescription = sceneDescription
+    .replace(/\b(fight|battle|violence|scary|dangerous|weapon|hurt|pain)\b/gi, 'adventure')
+    .replace(/\b(dark|darkness|shadow|gloomy)\b/gi, 'mysterious')
+    .replace(/\b(monster|beast|creature)\b/gi, 'friendly character');
 
-Style requirements: ${artStyle}, child-friendly, warm colors, storybook illustration, high quality, detailed background, appealing to children`;
+  if (!characterSheet) {
+    return `Create a wholesome ${artStyle} children's book illustration showing: ${safeSceneDescription}
+
+Style: ${artStyle} art style, bright cheerful colors, safe family-friendly content, whimsical storybook illustration, detailed pleasant background, appealing to young children ages 3-8`;
   }
 
-  return `${artStyle} illustration: ${sceneDescription}
+  return `Create a wholesome ${artStyle} children's book illustration showing: ${safeSceneDescription}
 
-Main character details (MUST be consistent):
-- Name: ${characterSheet.name}
-- Hair: ${characterSheet.hairColor} ${characterSheet.hairStyle}
+Character appearance (maintain consistency):
+- Child named ${characterSheet.name}
+- Hair: ${characterSheet.hairColor} ${characterSheet.hairStyle}  
 - Eyes: ${characterSheet.eyeColor}
 - Skin: ${characterSheet.skinTone}
 - Face: ${characterSheet.faceShape} face
-- Outfit: ${characterSheet.typicalOutfit}
+- Clothing: ${characterSheet.typicalOutfit}
 ${characterSheet.accessory ? `- Accessory: ${characterSheet.accessory}` : ''}
 ${characterSheet.distinctiveFeatures ? `- Features: ${characterSheet.distinctiveFeatures}` : ''}
 
-Style requirements: ${artStyle}, child-friendly, warm colors, storybook illustration, high quality, detailed background, consistent character design, appealing to children`;
+Style: ${artStyle} art style, bright cheerful colors, safe family-friendly content, whimsical storybook illustration, detailed pleasant background, consistent character design, appealing to young children ages 3-8`;
 }
