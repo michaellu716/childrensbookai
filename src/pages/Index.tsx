@@ -45,6 +45,10 @@ const Index = () => {
                   Welcome, {user.email}
                 </span>
               )}
+              <Button variant="ghost" onClick={() => navigate('/library')}>
+                <BookOpen className="mr-2 h-4 w-4" />
+                My Library
+              </Button>
               <Button variant="outline" onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out

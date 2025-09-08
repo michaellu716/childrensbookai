@@ -1,94 +1,191 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Filter } from "lucide-react";
+import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface Story {
+  id: string;
+  title: string;
+  child_name: string;
+  child_age: string;
+  themes: string[];
+  art_style: string;
+  length: number;
+  created_at: string;
+  status: string;
+  updated_at: string;
+  user_id: string;
+}
 
 const Library = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
+  const [stories, setStories] = useState<Story[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock library data
-  const stories = [
-    {
-      id: 1,
-      title: "Emma's Space Adventure",
-      childName: "Emma",
-      age: "4-5",
-      themes: ["space", "adventure", "friendship"],
-      artStyle: "cartoon",
-      pages: 8,
-      createdAt: "2024-01-15",
-      thumbnail: "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?w=300&h=200&fit=crop&crop=center",
-      status: "completed"
-    },
-    {
-      id: 2,
-      title: "Oliver's Dino Detective Story",
-      childName: "Oliver",
-      age: "6-7",
-      themes: ["dinosaurs", "mystery", "problem-solving"],
-      artStyle: "comic",
-      pages: 12,
-      createdAt: "2024-01-10",
-      thumbnail: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=300&h=200&fit=crop&crop=center",
-      status: "completed"
-    },
-    {
-      id: 3,
-      title: "Lily's Magic Garden",
-      childName: "Lily",
-      age: "2-3",
-      themes: ["nature", "magic", "growth"],
-      artStyle: "watercolor",
-      pages: 8,
-      createdAt: "2024-01-08",
-      thumbnail: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=300&h=200&fit=crop&crop=center",
-      status: "completed"
-    },
-    {
-      id: 4,
-      title: "Max's Superhero Training",
-      childName: "Max",
-      age: "8-10",
-      themes: ["superheroes", "practice", "confidence"],
-      artStyle: "comic",
-      pages: 16,
-      createdAt: "2024-01-05",
-      thumbnail: "https://images.unsplash.com/photo-1635805737707-575885ab0820?w=300&h=200&fit=crop&crop=center",
-      status: "draft"
+  useEffect(() => {
+    fetchStories();
+  }, []);
+
+  const fetchStories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('stories')
+        .select('id, title, child_name, child_age, themes, art_style, length, created_at, status, updated_at, user_id')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setStories(data || []);
+    } catch (error) {
+      console.error('Error fetching stories:', error);
+      toast.error('Failed to load your stories');
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const filteredStories = stories.filter(story => {
     const matchesSearch = story.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         story.childName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         story.themes.some(theme => theme.toLowerCase().includes(searchQuery.toLowerCase()));
+                         story.child_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         story.themes?.some(theme => theme.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesFilter = selectedFilter === "all" || 
                          (selectedFilter === "completed" && story.status === "completed") ||
-                         (selectedFilter === "drafts" && story.status === "draft");
+                         (selectedFilter === "generating" && story.status === "generating") ||
+                         (selectedFilter === "failed" && story.status === "failed") ||
+                         (selectedFilter === "draft" && story.status === "draft");
     
     return matchesSearch && matchesFilter;
   });
 
-  const handleDuplicate = (storyId: number) => {
-    const story = stories.find(s => s.id === storyId);
-    if (story) {
-      alert(`Creating a new story based on "${story.title}"...`);
-      navigate('/create');
+  const handleDuplicate = async (storyId: string) => {
+    try {
+      const { data: originalStory } = await supabase
+        .from('stories')
+        .select('*')
+        .eq('id', storyId)
+        .single();
+
+      if (originalStory) {
+        const { data: newStory, error } = await supabase
+          .from('stories')
+          .insert({
+            title: `${originalStory.title} (Copy)`,
+            prompt: originalStory.prompt,
+            child_name: originalStory.child_name,
+            child_age: originalStory.child_age,
+            themes: originalStory.themes,
+            lesson: originalStory.lesson,
+            tone: originalStory.tone,
+            art_style: originalStory.art_style,
+            reading_level: originalStory.reading_level,
+            language: originalStory.language,
+            length: originalStory.length,
+            status: 'draft',
+            user_id: originalStory.user_id
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        toast.success('Story duplicated successfully!');
+        navigate(`/create?duplicate=${newStory.id}`);
+      }
+    } catch (error) {
+      console.error('Error duplicating story:', error);
+      toast.error('Failed to duplicate story');
     }
   };
 
-  const handleDelete = (storyId: number) => {
-    const story = stories.find(s => s.id === storyId);
-    if (story && confirm(`Are you sure you want to delete "${story.title}"?`)) {
-      alert("Story deleted successfully!");
+  const handleDelete = async (storyId: string, storyTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${storyTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('stories')
+        .delete()
+        .eq('id', storyId);
+
+      if (error) throw error;
+      
+      toast.success('Story deleted successfully!');
+      fetchStories(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting story:', error);
+      toast.error('Failed to delete story');
     }
   };
+
+  const handleDownloadPDF = async (storyId: string) => {
+    try {
+      toast.info('Generating PDF...');
+      const { data, error } = await supabase.functions.invoke('generate-story-pdf', {
+        body: { storyId }
+      });
+
+      if (error) throw error;
+      
+      if (data?.pdfUrl) {
+        const link = document.createElement('a');
+        link.href = data.pdfUrl;
+        link.download = data.filename || 'story.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('PDF downloaded successfully!');
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.error('Failed to generate PDF');
+    }
+  };
+
+  const handleShare = (storyId: string, storyTitle: string) => {
+    const shareUrl = `${window.location.origin}/review?storyId=${storyId}`;
+    navigator.clipboard.writeText(shareUrl);
+    toast.success(`Share link for "${storyTitle}" copied to clipboard!`);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge variant="default">✓ Complete</Badge>;
+      case 'generating':
+        return <Badge variant="secondary">🔄 Generating</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">⚠️ Failed</Badge>;
+      default:
+        return <Badge variant="outline">📝 Draft</Badge>;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading your stories...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -141,9 +238,16 @@ const Library = () => {
                 Completed ({stories.filter(s => s.status === "completed").length})
               </Button>
               <Button
-                variant={selectedFilter === "drafts" ? "default" : "outline"}
+                variant={selectedFilter === "generating" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setSelectedFilter("drafts")}
+                onClick={() => setSelectedFilter("generating")}
+              >
+                Generating ({stories.filter(s => s.status === "generating").length})
+              </Button>
+              <Button
+                variant={selectedFilter === "draft" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedFilter("draft")}
               >
                 Drafts ({stories.filter(s => s.status === "draft").length})
               </Button>
@@ -156,10 +260,10 @@ const Library = () => {
           <Card className="p-12 text-center bg-gradient-card">
             <BookOpen className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">
-              {searchQuery ? "No stories found" : "No stories yet"}
+              {searchQuery || selectedFilter !== "all" ? "No stories found" : "No stories yet"}
             </h3>
             <p className="text-muted-foreground mb-6">
-              {searchQuery 
+              {searchQuery || selectedFilter !== "all"
                 ? "Try adjusting your search terms or filters"
                 : "Create your first magical bedtime story!"
               }
@@ -173,22 +277,18 @@ const Library = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredStories.map((story) => (
               <Card key={story.id} className="overflow-hidden hover:shadow-card transition-all duration-300 bg-gradient-card group">
-                {/* Thumbnail */}
-                <div className="relative h-48 overflow-hidden">
-                  <img 
-                    src={story.thumbnail} 
-                    alt={story.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                {/* Header */}
+                <div className="relative p-6 border-b bg-gradient-to-r from-primary/5 to-secondary/5">
                   <div className="absolute top-3 right-3">
-                    <Badge variant={story.status === "completed" ? "default" : "secondary"}>
-                      {story.status === "completed" ? "✓ Complete" : "📝 Draft"}
-                    </Badge>
+                    {getStatusBadge(story.status)}
                   </div>
-                  <div className="absolute bottom-3 left-3">
-                    <div className="text-white text-sm font-medium">
-                      {story.pages} pages • {story.artStyle}
+                  <div className="pr-20">
+                    <h3 className="font-semibold text-lg line-clamp-2 mb-1">{story.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      For {story.child_name}, {story.child_age ? `age ${story.child_age}` : ''}
+                    </p>
+                    <div className="text-xs text-muted-foreground mt-2">
+                      {story.length} pages • {story.art_style}
                     </div>
                   </div>
                 </div>
@@ -196,29 +296,24 @@ const Library = () => {
                 {/* Content */}
                 <div className="p-6">
                   <div className="space-y-3">
-                    <div>
-                      <h3 className="font-semibold text-lg line-clamp-1">{story.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        For {story.childName}, ages {story.age}
-                      </p>
-                    </div>
-
                     {/* Themes */}
-                    <div className="flex flex-wrap gap-1">
-                      {story.themes.slice(0, 3).map((theme) => (
-                        <Badge key={theme} variant="outline" className="text-xs">
-                          {theme}
-                        </Badge>
-                      ))}
-                      {story.themes.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{story.themes.length - 3}
-                        </Badge>
-                      )}
-                    </div>
+                    {story.themes && story.themes.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {story.themes.slice(0, 3).map((theme) => (
+                          <Badge key={theme} variant="outline" className="text-xs">
+                            {theme}
+                          </Badge>
+                        ))}
+                        {story.themes.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{story.themes.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
 
                     <div className="text-xs text-muted-foreground">
-                      Created {new Date(story.createdAt).toLocaleDateString()}
+                      Created {formatDate(story.created_at)}
                     </div>
 
                     {/* Actions */}
@@ -226,24 +321,35 @@ const Library = () => {
                       <Button 
                         size="sm" 
                         variant="default"
-                        onClick={() => navigate('/review')}
+                        onClick={() => navigate(`/review?storyId=${story.id}`)}
                         className="flex-1"
                       >
-                        {story.status === "completed" ? "View" : "Continue"}
+                        {story.status === "completed" ? "View" : story.status === "generating" ? "Check Progress" : "Continue"}
                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline"
                         onClick={() => handleDuplicate(story.id)}
+                        title="Duplicate story"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
                       {story.status === "completed" && (
                         <>
-                          <Button size="sm" variant="outline">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleDownloadPDF(story.id)}
+                            title="Download PDF"
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="outline">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleShare(story.id, story.title)}
+                            title="Share story"
+                          >
                             <Share className="h-4 w-4" />
                           </Button>
                         </>
@@ -251,8 +357,9 @@ const Library = () => {
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={() => handleDelete(story.id)}
+                        onClick={() => handleDelete(story.id, story.title)}
                         className="text-destructive hover:text-destructive"
+                        title="Delete story"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -277,7 +384,7 @@ const Library = () => {
                 <div className="text-sm opacity-90">Completed</div>
               </div>
               <div>
-                <div className="text-2xl font-bold">{[...new Set(stories.map(s => s.childName))].length}</div>
+                <div className="text-2xl font-bold">{[...new Set(stories.map(s => s.child_name).filter(Boolean))].length}</div>
                 <div className="text-sm opacity-90">Characters</div>
               </div>
             </div>
