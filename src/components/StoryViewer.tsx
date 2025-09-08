@@ -161,15 +161,11 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     }
   }, [currentPage, pages, ttsSupported, story?.status, hasUserNavigated]); // Added hasUserNavigated to dependencies
 
-  // Set hasUserNavigated to true after initial load
+  // Reset autoplay guard when story changes
   useEffect(() => {
-    if (pages.length > 0 && story && !isLoading) {
-      const timer = setTimeout(() => {
-        setHasUserNavigated(true);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [pages, story, isLoading]);
+    setHasUserNavigated(false);
+    stop();
+  }, [storyId]);
 
   const fetchStory = async (retryCount = 0) => {
     if (isFetchingRef.current) return;
@@ -766,7 +762,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
           
           {/* Text Content */}
           {currentPageData.text_content && (
-            <div className="p-6 bg-background">
+            <div className="px-6 pt-3 pb-6 bg-background">
               {editingPageId === currentPageData.id ? (
                 <div className="space-y-4">
                   <Textarea
