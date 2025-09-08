@@ -122,6 +122,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     pitch: 0.95,
     volume: 1,
   });
+  
+  const [hasUserNavigated, setHasUserNavigated] = useState(false);
 
   const POLL_INTERVAL = 5000;
   const pollTimeoutRef = useRef<number | null>(null);
@@ -144,7 +146,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
 
   // Auto-play text when page changes
   useEffect(() => {
-    if (ttsSupported && pages.length > 0 && pages[currentPage]?.text_content && story?.status !== 'generating') {
+    if (ttsSupported && pages.length > 0 && pages[currentPage]?.text_content && story?.status !== 'generating' && hasUserNavigated) {
       console.log('Auto-play triggered for page:', currentPage, pages[currentPage]?.text_content?.substring(0, 50));
       
       // Small delay to ensure page transition is smooth
@@ -157,7 +159,17 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         clearTimeout(timer);
       };
     }
-  }, [currentPage, pages, ttsSupported, story?.status]); // Added story status to dependencies
+  }, [currentPage, pages, ttsSupported, story?.status, hasUserNavigated]); // Added hasUserNavigated to dependencies
+
+  // Set hasUserNavigated to true after initial load
+  useEffect(() => {
+    if (pages.length > 0 && story && !isLoading) {
+      const timer = setTimeout(() => {
+        setHasUserNavigated(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [pages, story, isLoading]);
 
   const fetchStory = async (retryCount = 0) => {
     if (isFetchingRef.current) return;
@@ -457,6 +469,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     if (currentPage < pages.length - 1) {
       setCurrentPage(currentPage + 1);
       setEditingPageId(null); // Reset editing state when navigating
+      setHasUserNavigated(true); // Mark as user navigation
     }
   };
 
@@ -464,6 +477,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     if (currentPage > 0) {
       setCurrentPage(currentPage - 1);
       setEditingPageId(null); // Reset editing state when navigating
+      setHasUserNavigated(true); // Mark as user navigation
     }
   };
 
@@ -879,7 +893,10 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
           {pages.map((_, index) => (
             <button
               key={index}
-              onClick={() => setCurrentPage(index)}
+              onClick={() => {
+                setCurrentPage(index);
+                setHasUserNavigated(true); // Mark as user navigation
+              }}
               className={`w-3 h-3 rounded-full transition-colors ${
                 index === currentPage
                   ? 'bg-primary'
