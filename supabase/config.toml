@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.generate-story-with-character]
 verify_jwt = true
+
+[functions.get-story-details]
+verify_jwt = true

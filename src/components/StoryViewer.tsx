@@ -73,6 +73,49 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
 
     try {
       console.log(`Fetching story (attempt ${retryCount + 1})`);
+
+      // Try edge function first to reduce roundtrips and avoid transient CORS/network hiccups
+      try {
+        const { data: fnData, error: fnError } = await supabase.functions.invoke('get-story-details', {
+          body: { storyId }
+        });
+        if (!fnError && fnData && (fnData as any).story) {
+          const s = (fnData as any).story as any;
+          const p = ((fnData as any).pages || []) as any[];
+          const g = ((fnData as any).generations || []) as any[];
+
+          setStory(s);
+          setPages(p);
+          setGenerations(g);
+
+          const estimatedTotal = Number(s.length || p.length || 0);
+          setTotalCount(estimatedTotal);
+          const completed = p.filter(pg => !!pg.image_url).length;
+          setCompletedCount(completed);
+
+          if (s.status === 'generating') {
+            setIsPolling(true);
+            if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+            pollTimeoutRef.current = window.setTimeout(() => {
+              if (!isMountedRef.current) return;
+              fetchStory();
+            }, POLL_INTERVAL);
+          } else {
+            setIsPolling(false);
+            if (pollTimeoutRef.current) {
+              clearTimeout(pollTimeoutRef.current);
+              pollTimeoutRef.current = null;
+            }
+          }
+
+          setIsLoading(false);
+          return; // Skip direct table queries when function succeeds
+        } else if (fnError) {
+          console.warn('get-story-details error:', fnError);
+        }
+      } catch (e) {
+        console.warn('Edge function fetch failed, falling back to direct queries:', e);
+      }
       
       // Fetch story details with aggressive retry for network failures
       let storyData = null;
