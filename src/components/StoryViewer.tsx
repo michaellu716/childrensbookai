@@ -3,7 +3,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ChevronLeft, ChevronRight, Download, Share2, Edit, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ChevronLeft, ChevronRight, Download, Share2, Edit, Loader2, RefreshCw, AlertCircle, Save, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -49,6 +50,9 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const [completedCount, setCompletedCount] = useState<number>(0);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+  const [editingPageId, setEditingPageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const POLL_INTERVAL = 5000;
   const pollTimeoutRef = useRef<number | null>(null);
@@ -366,12 +370,56 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const nextPage = () => {
     if (currentPage < pages.length - 1) {
       setCurrentPage(currentPage + 1);
+      setEditingPageId(null); // Reset editing state when navigating
     }
   };
 
   const prevPage = () => {
     if (currentPage > 0) {
       setCurrentPage(currentPage - 1);
+      setEditingPageId(null); // Reset editing state when navigating
+    }
+  };
+
+  const startEditing = (pageId: string, currentText: string) => {
+    setEditingPageId(pageId);
+    setEditingText(currentText);
+  };
+
+  const cancelEditing = () => {
+    setEditingPageId(null);
+    setEditingText('');
+  };
+
+  const savePageText = async () => {
+    if (!editingPageId) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('story_pages')
+        .update({ text_content: editingText.trim() })
+        .eq('id', editingPageId);
+
+      if (error) throw error;
+
+      // Update the local state
+      setPages(prevPages => 
+        prevPages.map(page => 
+          page.id === editingPageId 
+            ? { ...page, text_content: editingText.trim() }
+            : page
+        )
+      );
+
+      toast.success('Page text updated successfully!');
+      setEditingPageId(null);
+      setEditingText('');
+    } catch (error) {
+      console.error('Error saving page text:', error);
+      toast.error('Failed to save page text');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -589,17 +637,62 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
           {/* Text Content */}
           {currentPageData.text_content && (
             <div className="p-6 bg-background">
-              <p className="text-lg leading-relaxed text-center">
-                {currentPageData.text_content}
-              </p>
-              
-              {/* Edit button for text */}
-              <div className="flex justify-center mt-4">
-                <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Text
-                </Button>
-              </div>
+              {editingPageId === currentPageData.id ? (
+                <div className="space-y-4">
+                  <Textarea
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    className="min-h-[120px] text-lg"
+                    placeholder="Enter page text..."
+                    maxLength={2000}
+                    disabled={story?.status === 'generating'}
+                  />
+                  <div className="flex justify-center gap-2">
+                    <Button 
+                      onClick={savePageText} 
+                      disabled={isSaving || editingText.trim() === currentPageData.text_content}
+                      size="sm"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      Save
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={cancelEditing}
+                      size="sm"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    {editingText.length}/2000 characters
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-lg leading-relaxed text-center">
+                    {currentPageData.text_content}
+                  </p>
+                  
+                  {/* Edit button for text */}
+                  <div className="flex justify-center mt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => startEditing(currentPageData.id, currentPageData.text_content)}
+                      disabled={story?.status === 'generating'}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Text
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </Card>
