@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,19 +50,48 @@ const Library = () => {
     }
   };
 
-  const filteredStories = stories.filter(story => {
-    const matchesSearch = story.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         story.child_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         story.themes?.some(theme => theme.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Memoize expensive computations
+  const { filteredStories, statusCounts, totalCharacters } = useMemo(() => {
+    const lowerSearchQuery = searchQuery.toLowerCase();
     
-    const matchesFilter = selectedFilter === "all" || 
-                         (selectedFilter === "completed" && story.status === "completed") ||
-                         (selectedFilter === "generating" && story.status === "generating") ||
-                         (selectedFilter === "failed" && story.status === "failed") ||
-                         (selectedFilter === "draft" && story.status === "draft");
+    // Calculate status counts once
+    const counts = {
+      completed: 0,
+      generating: 0,
+      draft: 0,
+      failed: 0
+    };
     
-    return matchesSearch && matchesFilter;
-  });
+    const uniqueCharacters = new Set<string>();
+    
+    const filtered = stories.filter(story => {
+      // Count statuses while filtering
+      if (story.status === "completed") counts.completed++;
+      else if (story.status === "generating") counts.generating++;
+      else if (story.status === "draft") counts.draft++;
+      else if (story.status === "failed") counts.failed++;
+      
+      // Track unique characters
+      if (story.child_name) uniqueCharacters.add(story.child_name);
+      
+      // Search matching
+      const matchesSearch = !searchQuery || 
+        story.title.toLowerCase().includes(lowerSearchQuery) ||
+        story.child_name?.toLowerCase().includes(lowerSearchQuery) ||
+        story.themes?.some(theme => theme.toLowerCase().includes(lowerSearchQuery));
+      
+      // Filter matching
+      const matchesFilter = selectedFilter === "all" || story.status === selectedFilter;
+      
+      return matchesSearch && matchesFilter;
+    });
+    
+    return {
+      filteredStories: filtered,
+      statusCounts: counts,
+      totalCharacters: uniqueCharacters.size
+    };
+  }, [stories, searchQuery, selectedFilter]);
 
   const handleDuplicate = async (storyId: string) => {
     try {
@@ -235,21 +264,21 @@ const Library = () => {
                 size="sm"
                 onClick={() => setSelectedFilter("completed")}
               >
-                Completed ({stories.filter(s => s.status === "completed").length})
+                Completed ({statusCounts.completed})
               </Button>
               <Button
                 variant={selectedFilter === "generating" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedFilter("generating")}
               >
-                Generating ({stories.filter(s => s.status === "generating").length})
+                Generating ({statusCounts.generating})
               </Button>
               <Button
                 variant={selectedFilter === "draft" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedFilter("draft")}
               >
-                Drafts ({stories.filter(s => s.status === "draft").length})
+                Drafts ({statusCounts.draft})
               </Button>
             </div>
           </div>
@@ -380,11 +409,11 @@ const Library = () => {
                 <div className="text-sm opacity-90">Total Stories</div>
               </div>
               <div>
-                <div className="text-2xl font-bold">{stories.filter(s => s.status === "completed").length}</div>
+                <div className="text-2xl font-bold">{statusCounts.completed}</div>
                 <div className="text-sm opacity-90">Completed</div>
               </div>
               <div>
-                <div className="text-2xl font-bold">{[...new Set(stories.map(s => s.child_name).filter(Boolean))].length}</div>
+                <div className="text-2xl font-bold">{totalCharacters}</div>
                 <div className="text-sm opacity-90">Characters</div>
               </div>
             </div>
