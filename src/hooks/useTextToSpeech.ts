@@ -40,6 +40,19 @@ export const useTextToSpeech = (options: UseTextToSpeechOptions = {}): UseTextTo
       const loadVoices = () => {
         const availableVoices = speechSynthesis.getVoices();
         setVoices(availableVoices);
+        
+        // Try to find a more natural voice
+        const preferredVoices = availableVoices.filter(voice => 
+          voice.name.includes('Natural') || 
+          voice.name.includes('Enhanced') ||
+          voice.name.includes('Premium') ||
+          voice.name.includes('Neural') ||
+          (voice.lang.startsWith('en') && voice.localService === false) // Cloud voices are often better
+        );
+        
+        if (preferredVoices.length > 0) {
+          console.log('Found enhanced voices:', preferredVoices.map(v => v.name));
+        }
       };
 
       loadVoices();
@@ -66,7 +79,21 @@ export const useTextToSpeech = (options: UseTextToSpeechOptions = {}): UseTextTo
     utterance.pitch = pitch;
     utterance.volume = volume;
 
-    if (voice) {
+    // Try to select a better voice
+    if (!voice && voices.length > 0) {
+      const preferredVoice = voices.find(v => 
+        v.name.includes('Natural') || 
+        v.name.includes('Enhanced') ||
+        v.name.includes('Premium') ||
+        v.name.includes('Neural') ||
+        (v.lang.startsWith('en') && v.localService === false)
+      ) || voices.find(v => v.lang.startsWith('en-US')) || voices[0];
+      
+      if (preferredVoice) {
+        console.log('Using voice:', preferredVoice.name);
+        utterance.voice = preferredVoice;
+      }
+    } else if (voice) {
       utterance.voice = voice;
     }
 

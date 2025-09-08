@@ -117,9 +117,9 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
   
   // Text-to-speech
-  const { speak, stop, pause, resume, isSupported: ttsSupported, isPlaying: ttsPlaying, isPaused: ttsPaused } = useTextToSpeech({
-    rate: 0.9,
-    pitch: 1.1,
+  const { speak, stop, pause, resume, isSupported: ttsSupported, isPlaying: ttsPlaying, isPaused: ttsPaused, voices } = useTextToSpeech({
+    rate: 0.85,
+    pitch: 0.95,
     volume: 1,
   });
 
