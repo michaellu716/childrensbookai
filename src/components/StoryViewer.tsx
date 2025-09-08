@@ -70,19 +70,38 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     isFetchingRef.current = true;
 
     try {
-      // Fetch story details (simplified query to avoid timeout issues)
-      const { data: storyData, error: storyError } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('id', storyId)
-        .maybeSingle();
+      console.log(`Fetching story (attempt ${retryCount + 1})`);
+      
+      // Fetch story details with aggressive retry for network failures
+      let storyData = null;
+      let storyAttempt = 0;
+      while (storyAttempt < 3) {
+        try {
+          const { data, error } = await supabase
+            .from('stories')
+            .select('*')
+            .eq('id', storyId)
+            .maybeSingle();
 
-      if (storyError) {
-        throw storyError;
+          if (error) throw error;
+          storyData = data;
+          break;
+        } catch (err) {
+          storyAttempt++;
+          const isNetworkError = String(err.message).includes('Failed to fetch') || 
+                                String(err.message).includes('QUIC') ||
+                                String(err.message).includes('network');
+          
+          if (storyAttempt < 3 && isNetworkError) {
+            console.log(`Story fetch failed, retrying in ${1000 * storyAttempt}ms`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * storyAttempt));
+            continue;
+          }
+          throw err;
+        }
       }
 
       if (!storyData) {
-        // Not found
         setStory(null);
         setPages([]);
         setGenerations([]);
@@ -95,66 +114,92 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         return;
       }
 
-      // Fetch character sheet separately if needed (only if character_sheet_id exists)
+      // Fetch character sheet with retry
       let characterSheet = null;
       if (storyData.character_sheet_id) {
-        try {
-          const { data: characterData } = await supabase
-            .from('character_sheets')
-            .select('name, hair_color, hair_style, eye_color, skin_tone, typical_outfit, cartoon_reference_url')
-            .eq('id', storyData.character_sheet_id)
-            .maybeSingle();
-          characterSheet = characterData;
-        } catch (err) {
-          console.warn('Failed to fetch character sheet:', err);
+        let charAttempt = 0;
+        while (charAttempt < 2) {
+          try {
+            const { data } = await supabase
+              .from('character_sheets')
+              .select('name, hair_color, hair_style, eye_color, skin_tone, typical_outfit, cartoon_reference_url')
+              .eq('id', storyData.character_sheet_id)
+              .maybeSingle();
+            characterSheet = data;
+            break;
+          } catch (err) {
+            charAttempt++;
+            const isNetworkError = String(err.message).includes('Failed to fetch') || 
+                                  String(err.message).includes('QUIC');
+            if (charAttempt < 2 && isNetworkError) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+            console.warn('Failed to fetch character sheet:', err);
+            break;
+          }
         }
       }
 
-      // Fetch story pages with retry on network errors
+      // Fetch story pages with aggressive retry
       let pagesData = [];
-      try {
-        const { data, error: pagesError } = await supabase
-          .from('story_pages')
-          .select('id, page_number, page_type, text_content, image_url, image_prompt')
-          .eq('story_id', storyId)
-          .order('page_number');
+      let pagesAttempt = 0;
+      while (pagesAttempt < 5) {
+        try {
+          const { data, error } = await supabase
+            .from('story_pages')
+            .select('id, page_number, page_type, text_content, image_url, image_prompt')
+            .eq('story_id', storyId)
+            .order('page_number');
 
-        if (pagesError) {
-          throw pagesError;
+          if (error) throw error;
+          pagesData = data || [];
+          console.log(`Successfully fetched ${pagesData.length} pages`);
+          break;
+        } catch (err) {
+          pagesAttempt++;
+          const isNetworkError = String(err.message).includes('Failed to fetch') || 
+                                String(err.message).includes('QUIC') ||
+                                String(err.message).includes('network');
+          
+          if (pagesAttempt < 5 && isNetworkError) {
+            const delay = Math.min(1000 * pagesAttempt, 5000);
+            console.log(`Pages fetch failed (attempt ${pagesAttempt}), retrying in ${delay}ms`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          throw err;
         }
-        pagesData = data || [];
-      } catch (err) {
-        if (retryCount < 2 && (String(err.message).includes('Failed to fetch') || String(err.message).includes('QUIC'))) {
-          // Network retry for pages
-          console.log(`Retrying pages fetch (attempt ${retryCount + 1})`);
-          setTimeout(() => {
-            if (!isMountedRef.current) return;
-            fetchStory(retryCount + 1);
-          }, 1000 * (retryCount + 1));
-          return;
-        }
-        throw err;
       }
 
-      // Fetch generation status and errors (simplified query)
+      // Fetch generations with retry
       let generationsData = [];
-      try {
-        const { data, error: generationsError } = await supabase
-          .from('story_generations')
-          .select('id, generation_type, status, error_message, created_at')
-          .eq('story_id', storyId)
-          .order('created_at', { ascending: false });
+      let genAttempt = 0;
+      while (genAttempt < 2) {
+        try {
+          const { data, error } = await supabase
+            .from('story_generations')
+            .select('id, generation_type, status, error_message, created_at')
+            .eq('story_id', storyId)
+            .order('created_at', { ascending: false });
 
-        if (generationsError) {
-          console.error('Error fetching generations:', generationsError);
-        } else {
-          generationsData = data || [];
+          if (error) console.error('Error fetching generations:', error);
+          else generationsData = data || [];
+          break;
+        } catch (err) {
+          genAttempt++;
+          const isNetworkError = String(err.message).includes('Failed to fetch') || 
+                                String(err.message).includes('QUIC');
+          if (genAttempt < 2 && isNetworkError) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+          console.warn('Failed to fetch generations:', err);
+          break;
         }
-      } catch (err) {
-        console.warn('Failed to fetch generations:', err);
       }
 
-      // Attach character sheet to story data
+      // Update state
       const storyWithCharacter = characterSheet 
         ? { ...storyData, character_sheets: characterSheet }
         : { ...storyData, character_sheets: null };
@@ -182,38 +227,32 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
       setIsLoading(false);
 
     } catch (error: any) {
-      // Handle transient network and timeout errors
+      console.error('Error fetching story:', error);
+      
       const msg = String(error?.message || error?.code || 'unknown');
       const isTransient = msg.includes('timeout') || 
                          msg.includes('57014') || 
-                         msg.includes('statement timeout') ||
                          msg.includes('Failed to fetch') ||
                          msg.includes('QUIC') ||
                          msg.includes('network');
 
-      console.error('Error fetching story:', error);
-
-      if (isTransient && retryCount < 3 && isMountedRef.current) {
-        // Network retry with exponential backoff
-        setIsPolling(true);
+      if (isTransient && retryCount < 2 && isMountedRef.current) {
+        const retryDelay = Math.min(3000 * (retryCount + 1), 8000);
+        console.log(`Final retry in ${retryDelay}ms (attempt ${retryCount + 1})`);
+        
         if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-        
-        const retryDelay = Math.min(2000 * Math.pow(2, retryCount), 10000); // 2s, 4s, 8s max
-        console.log(`Retrying story fetch in ${retryDelay}ms (attempt ${retryCount + 1})`);
-        
         pollTimeoutRef.current = window.setTimeout(() => {
           if (!isMountedRef.current) return;
           fetchStory(retryCount + 1);
         }, retryDelay);
       } else {
-        // Non-retryable error or max retries reached: stop loading and show toast
         setIsPolling(false);
         if (pollTimeoutRef.current) {
           clearTimeout(pollTimeoutRef.current);
           pollTimeoutRef.current = null;
         }
         setIsLoading(false);
-        toast.error('Network error loading story. Please check your connection and try again.');
+        toast.error('Unable to load story due to network issues. Please refresh the page.');
       }
     } finally {
       isFetchingRef.current = false;
