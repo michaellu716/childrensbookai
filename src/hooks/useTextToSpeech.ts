@@ -54,6 +54,8 @@ export const useTextToSpeech = (options: UseTextToSpeechOptions = {}): UseTextTo
   const speak = (text: string) => {
     if (!isSupported || !text.trim()) return;
 
+    console.log('TTS: Starting to speak:', text.substring(0, 50) + '...');
+    
     // Stop any current speech
     speechSynthesis.cancel();
 
@@ -69,27 +71,32 @@ export const useTextToSpeech = (options: UseTextToSpeechOptions = {}): UseTextTo
     }
 
     utterance.onstart = () => {
+      console.log('TTS: Speech started');
       setIsPlaying(true);
       setIsPaused(false);
     };
 
     utterance.onend = () => {
+      console.log('TTS: Speech ended');
       setIsPlaying(false);
       setIsPaused(false);
       utteranceRef.current = null;
     };
 
-    utterance.onerror = () => {
+    utterance.onerror = (event) => {
+      console.log('TTS: Speech error:', event.error);
       setIsPlaying(false);
       setIsPaused(false);
       utteranceRef.current = null;
     };
 
     utterance.onpause = () => {
+      console.log('TTS: Speech paused');
       setIsPaused(true);
     };
 
     utterance.onresume = () => {
+      console.log('TTS: Speech resumed');
       setIsPaused(false);
     };
 

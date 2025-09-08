@@ -145,14 +145,19 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   // Auto-play text when page changes
   useEffect(() => {
     if (ttsSupported && pages.length > 0 && pages[currentPage]?.text_content) {
+      console.log('Auto-play triggered for page:', currentPage, pages[currentPage]?.text_content?.substring(0, 50));
+      
       // Small delay to ensure page transition is smooth
       const timer = setTimeout(() => {
         speak(pages[currentPage].text_content);
-      }, 500);
+      }, 800);
       
-      return () => clearTimeout(timer);
+      return () => {
+        console.log('Cleaning up auto-play timer');
+        clearTimeout(timer);
+      };
     }
-  }, [currentPage, pages, ttsSupported, speak]);
+  }, [currentPage, pages, ttsSupported]); // Removed 'speak' from dependencies
 
   const fetchStory = async (retryCount = 0) => {
     if (isFetchingRef.current) return;
