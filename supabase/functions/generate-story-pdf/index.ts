@@ -120,6 +120,9 @@ serve(async (req) => {
 });
 
 async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
+  const startTime = Date.now();
+  const MAX_PROCESSING_TIME = 8000; // 8 seconds max to avoid CPU timeout
+  
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -143,7 +146,19 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     }
   }
 
-  for (const p of pages) {
+  // Limit to first 10 pages to prevent CPU timeout
+  const limitedPages = pages.slice(0, 10);
+  console.log(`Processing ${limitedPages.length} pages for PDF`);
+
+  for (let i = 0; i < limitedPages.length; i++) {
+    const p = limitedPages[i];
+    
+    // Check if we're running out of time
+    if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+      console.warn(`PDF generation timeout after ${i} pages, generating partial PDF`);
+      break;
+    }
+    
     const page = pdfDoc.addPage([612, 792]);
     const { width, height } = page.getSize();
     const margin = 50;
@@ -159,14 +174,14 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     });
     cursorY -= 20;
 
-    // Optional image
-    if (p.image_url) {
+    // Optional image with optimized processing
+    if (p.image_url && Date.now() - startTime < MAX_PROCESSING_TIME - 2000) {
       try {
-        const embedded = await embedImage(pdfDoc, p.image_url);
+        const embedded = await embedImageOptimized(pdfDoc, p.image_url);
         if (embedded) {
           const maxW = width - margin * 2;
           const maxH = 300;
-          const scale = Math.min(maxW / embedded.width, maxH / embedded.height);
+          const scale = Math.min(maxW / embedded.width, maxH / embedded.height, 1); // Don't upscale
           const drawW = embedded.width * scale;
           const drawH = embedded.height * scale;
 
@@ -179,7 +194,8 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
           cursorY -= drawH + 20;
         }
       } catch (e) {
-        console.warn('Failed to embed image for PDF:', e);
+        console.warn(`Failed to embed image for page ${p.page_number}:`, e);
+        // Continue without image rather than failing
       }
     }
 
@@ -189,39 +205,78 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     }
   }
 
+  console.log(`PDF generation completed in ${Date.now() - startTime}ms`);
   return await pdfDoc.save();
 }
 
-async function embedImage(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
+async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
   try {
-    if (imageUrl.startsWith('data:image/png;base64,')) {
-      const b64 = imageUrl.replace('data:image/png;base64,', '');
-      const bytes = base64ToBytes(b64);
-      const img = await pdfDoc.embedPng(bytes);
-      return { image: img, width: img.width, height: img.height };
+    // Handle data URLs efficiently
+    if (imageUrl.startsWith('data:image/')) {
+      const [header, base64Data] = imageUrl.split(',');
+      if (!base64Data) return null;
+      
+      const bytes = base64ToBytes(base64Data);
+      const maxSize = 2 * 1024 * 1024; // 2MB limit
+      if (bytes.length > maxSize) {
+        console.warn(`Image too large: ${bytes.length} bytes, skipping`);
+        return null;
+      }
+      
+      if (header.includes('png')) {
+        const img = await pdfDoc.embedPng(bytes);
+        return { image: img, width: img.width, height: img.height };
+      } else if (header.includes('jpeg') || header.includes('jpg')) {
+        const img = await pdfDoc.embedJpg(bytes);
+        return { image: img, width: img.width, height: img.height };
+      }
     }
-    if (imageUrl.startsWith('data:image/jpeg;base64,') || imageUrl.startsWith('data:image/jpg;base64,')) {
-      const b64 = imageUrl.replace(/^data:image\/(jpeg|jpg);base64,/, '');
-      const bytes = base64ToBytes(b64);
-      const img = await pdfDoc.embedJpg(bytes);
-      return { image: img, width: img.width, height: img.height };
-    }
-    // Try fetching remote image
-    const res = await fetch(imageUrl);
-    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
-    const buf = new Uint8Array(await res.arrayBuffer());
-    // Heuristic: try PNG first, then JPG
+    
+    // Handle remote images with timeout and size limit
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    
     try {
-      const img = await pdfDoc.embedPng(buf);
-      // @ts-ignore
-      return { image: img, width: img.width, height: img.height };
-    } catch {
-      const img = await pdfDoc.embedJpg(buf);
-      // @ts-ignore
-      return { image: img, width: img.width, height: img.height };
+      const res = await fetch(imageUrl, { 
+        signal: controller.signal,
+        headers: { 'User-Agent': 'PDF-Generator/1.0' }
+      });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        console.warn(`Image fetch failed: ${res.status}`);
+        return null;
+      }
+      
+      const contentLength = res.headers.get('content-length');
+      if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) {
+        console.warn(`Image too large: ${contentLength} bytes`);
+        return null;
+      }
+      
+      const buf = new Uint8Array(await res.arrayBuffer());
+      if (buf.length > 2 * 1024 * 1024) {
+        console.warn(`Downloaded image too large: ${buf.length} bytes`);
+        return null;
+      }
+      
+      // Try PNG first, then JPG
+      try {
+        const img = await pdfDoc.embedPng(buf);
+        return { image: img, width: img.width, height: img.height };
+      } catch {
+        const img = await pdfDoc.embedJpg(buf);
+        return { image: img, width: img.width, height: img.height };
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
-  } catch (e) {
-    console.warn('embedImage error:', e);
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      console.warn('Image fetch timeout:', imageUrl);
+    } else {
+      console.warn('Image embed error:', e.message);
+    }
     return null;
   }
 }
