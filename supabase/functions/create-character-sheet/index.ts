@@ -101,17 +101,15 @@ Be specific and detailed to ensure consistent character generation. Focus on fea
     
     console.log('Character features extracted:', characterFeatures);
 
-    // Generate 3 cartoon avatar styles
+    // Generate 3 cartoon avatar styles in parallel for much faster generation
     console.log('Generating cartoon avatar styles...');
     
     const avatarStyles = ['Disney-style cartoon', 'Pixar-style 3D cartoon', 'Studio Ghibli-style illustration'];
-    const generatedAvatars = [];
     
     console.log('Starting avatar generation for styles:', avatarStyles);
 
-    for (let i = 0; i < avatarStyles.length; i++) {
-      const style = avatarStyles[i];
-      
+    // Generate all avatars in parallel
+    const avatarPromises = avatarStyles.map(async (style) => {
       const prompt = `Create a ${style} portrait of a child character based on these features:
 - Hair: ${characterFeatures.hairColor} ${characterFeatures.hairStyle}
 - Eyes: ${characterFeatures.eyeColor}
@@ -125,47 +123,57 @@ Style: ${style}, child-friendly, warm and appealing, suitable for a children's s
 
       console.log(`Generating ${style} avatar with prompt:`, prompt);
       
-      const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'dall-e-3',
-          prompt: prompt,
-          n: 1,
-          size: '1024x1024',
-          quality: 'standard',
-          response_format: 'b64_json'
-        }),
-      });
-
-      if (!imageResponse.ok) {
-        const errorText = await imageResponse.text();
-        console.error(`Failed to generate ${style} avatar:`, imageResponse.status, errorText);
-        continue;
-      }
-
-      const imageData = await imageResponse.json();
-      console.log(`Image response for ${style}:`, {
-        hasData: !!imageData.data,
-        dataLength: imageData.data?.length || 0,
-        firstImageKeys: imageData.data?.[0] ? Object.keys(imageData.data[0]) : []
-      });
-      
-      // Handle DALL-E-3 response format
-      if (imageData.data && imageData.data[0] && imageData.data[0].b64_json) {
-        generatedAvatars.push({
-          style: style,
-          imageUrl: `data:image/png;base64,${imageData.data[0].b64_json}`,
-          prompt: prompt
+      try {
+        const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-image-1',  // Faster than dall-e-3
+            prompt: prompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'medium',  // Faster than high quality
+            output_format: 'png'
+          }),
         });
-        console.log(`Successfully generated ${style} avatar`);
-      } else {
-        console.error(`No image data received for ${style} avatar. Response:`, imageData);
+
+        if (!imageResponse.ok) {
+          const errorText = await imageResponse.text();
+          console.error(`Failed to generate ${style} avatar:`, imageResponse.status, errorText);
+          return null;
+        }
+
+        const imageData = await imageResponse.json();
+        console.log(`Image response for ${style}:`, {
+          hasData: !!imageData.data,
+          dataLength: imageData.data?.length || 0,
+          firstImageKeys: imageData.data?.[0] ? Object.keys(imageData.data[0]) : []
+        });
+        
+        // Handle gpt-image-1 response format (always base64)
+        if (imageData.data && imageData.data[0] && imageData.data[0].b64_json) {
+          console.log(`Successfully generated ${style} avatar`);
+          return {
+            style: style,
+            imageUrl: `data:image/png;base64,${imageData.data[0].b64_json}`,
+            prompt: prompt
+          };
+        } else {
+          console.error(`No image data received for ${style} avatar. Response:`, imageData);
+          return null;
+        }
+      } catch (error) {
+        console.error(`Error generating ${style} avatar:`, error);
+        return null;
       }
-    }
+    });
+
+    // Wait for all avatar generations to complete
+    const avatarResults = await Promise.all(avatarPromises);
+    const generatedAvatars = avatarResults.filter(avatar => avatar !== null);
 
     console.log(`Generated ${generatedAvatars.length} avatar styles`);
 
