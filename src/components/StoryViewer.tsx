@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronLeft, ChevronRight, Download, Share2, Edit, Loader2, RefreshCw, AlertCircle, Save, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Share2, Edit, Loader2, RefreshCw, AlertCircle, Save, X, Play, Pause, Square } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 
 interface StoryPage {
   id: string;
@@ -114,6 +115,13 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   // Image loading state
   const [imageCache, setImageCache] = useState<Record<string, string>>({});
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
+  
+  // Text-to-speech
+  const { speak, stop, pause, resume, isSupported: ttsSupported, isPlaying: ttsPlaying, isPaused: ttsPaused } = useTextToSpeech({
+    rate: 0.9,
+    pitch: 1.1,
+    volume: 1,
+  });
 
   const POLL_INTERVAL = 5000;
   const pollTimeoutRef = useRef<number | null>(null);
@@ -769,6 +777,56 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
                   <p className="text-lg leading-relaxed text-center">
                     {currentPageData.text_content}
                   </p>
+                  
+                  {/* Text-to-Speech Controls */}
+                  {ttsSupported && (
+                    <div className="flex justify-center gap-2 mt-4">
+                      {!ttsPlaying ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => speak(currentPageData.text_content)}
+                          className="flex items-center gap-2"
+                        >
+                          <Play className="h-4 w-4" />
+                          Read Aloud
+                        </Button>
+                      ) : (
+                        <>
+                          {ttsPaused ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={resume}
+                              className="flex items-center gap-2"
+                            >
+                              <Play className="h-4 w-4" />
+                              Resume
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={pause}
+                              className="flex items-center gap-2"
+                            >
+                              <Pause className="h-4 w-4" />
+                              Pause
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={stop}
+                            className="flex items-center gap-2"
+                          >
+                            <Square className="h-4 w-4" />
+                            Stop
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   
                   {/* Edit button for text */}
                   <div className="flex justify-center mt-4">
