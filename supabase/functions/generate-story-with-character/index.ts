@@ -297,57 +297,74 @@ async function generateStoryIllustrations(
   console.log(`Generating illustrations for story ${storyId}...`);
   
   try {
-    for (const page of pages) {
+    // Generate all images in parallel for much faster performance
+    const imagePromises = pages.map(async (page) => {
       console.log(`Generating illustration for page ${page.pageNumber}...`);
       
       const imagePrompt = createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle?.style || 'cartoon');
       
-      const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'dall-e-3',
-          prompt: imagePrompt,
-          n: 1,
-          size: '1024x1024',
-          quality: 'standard',
-          response_format: 'b64_json'
-        }),
-      });
+      try {
+        const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-image-1',  // Faster than dall-e-3
+            prompt: imagePrompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'medium',
+            output_format: 'png'
+          }),
+        });
 
-      if (!imageResponse.ok) {
-        const errorText = await imageResponse.text();
-        console.error(`Failed to generate image for page ${page.pageNumber}:`, imageResponse.status, errorText);
-        continue;
+        if (!imageResponse.ok) {
+          const errorText = await imageResponse.text();
+          console.error(`Failed to generate image for page ${page.pageNumber}:`, imageResponse.status, errorText);
+          return { pageNumber: page.pageNumber, success: false, error: errorText };
+        }
+
+        const imageData = await imageResponse.json();
+        console.log(`Image response for page ${page.pageNumber}:`, JSON.stringify(imageData).substring(0, 200));
+        
+        // gpt-image-1 returns base64 directly
+        const base64Data = imageData.data[0].b64_json;
+        const imageUrl = `data:image/png;base64,${base64Data}`;
+        console.log(`Generated image URL length for page ${page.pageNumber}:`, imageUrl.length);
+
+        // Update story page with generated image
+        const { error: updateError } = await supabase
+          .from('story_pages')
+          .update({ 
+            image_url: imageUrl,
+            image_prompt: imagePrompt
+          })
+          .eq('story_id', storyId)
+          .eq('page_number', page.pageNumber);
+
+        if (updateError) {
+          console.error(`Failed to update page ${page.pageNumber}:`, updateError.message);
+          return { pageNumber: page.pageNumber, success: false, error: updateError.message };
+        } else {
+          console.log(`Page ${page.pageNumber} illustration completed`);
+          return { pageNumber: page.pageNumber, success: true };
+        }
+      } catch (error) {
+        console.error(`Error generating illustration for page ${page.pageNumber}:`, error);
+        return { pageNumber: page.pageNumber, success: false, error: error.message };
       }
+    });
 
-      const imageData = await imageResponse.json();
-      console.log(`Image response for page ${page.pageNumber}:`, JSON.stringify(imageData).substring(0, 200));
-      
-      // DALL-E-3 returns base64 in b64_json format
-      const base64Data = imageData.data[0].b64_json;
-      const imageUrl = `data:image/png;base64,${base64Data}`;
-      console.log(`Generated image URL length for page ${page.pageNumber}:`, imageUrl.length);
-
-      // Update story page with generated image
-      const { error: updateError } = await supabase
-        .from('story_pages')
-        .update({ 
-          image_url: imageUrl,
-          image_prompt: imagePrompt
-        })
-        .eq('story_id', storyId)
-        .eq('page_number', page.pageNumber);
-
-      if (updateError) {
-        console.error(`Failed to update page ${page.pageNumber}:`, updateError.message);
-      } else {
-        console.log(`Page ${page.pageNumber} illustration completed`);
-      }
-    }
+    // Wait for all images to complete (parallel execution)
+    const results = await Promise.allSettled(imagePromises);
+    
+    // Check results
+    const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+    const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length;
+    
+    console.log(`Illustration generation completed: ${successful} successful, ${failed} failed`);
 
     // After attempting all pages, verify completion
     const { data: missingPages, error: checkError } = await supabase
