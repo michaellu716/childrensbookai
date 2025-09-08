@@ -20,6 +20,7 @@ const CreateStory = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingCharacter, setIsCreatingCharacter] = useState(false);
+  const [characterCreationError, setCharacterCreationError] = useState<string | null>(null);
   const [characterSheet, setCharacterSheet] = useState<any>(null);
   const [selectedAvatarStyle, setSelectedAvatarStyle] = useState<any>(null);
   const [uploadedPhoto, setUploadedPhoto] = useState<string>("");
@@ -112,58 +113,77 @@ const CreateStory = () => {
     }
 
     setIsCreatingCharacter(true);
+    setCharacterCreationError(null); // Clear any previous errors
     
     try {
       // Convert file to base64 for API call
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const photoUrl = e.target?.result as string;
-        
-        const { data, error } = await supabase.functions.invoke('create-character-sheet', {
-          body: {
-            photoUrl,
-            childName: formData.childName,
-            childAge: formData.age
+        try {
+          const photoUrl = e.target?.result as string;
+          
+          const { data, error } = await supabase.functions.invoke('create-character-sheet', {
+            body: {
+              photoUrl,
+              childName: formData.childName,
+              childAge: formData.age
+            }
+          });
+
+          if (error) {
+            throw error;
           }
-        });
 
-        if (error) {
-          throw error;
+          setCharacterSheet(data.characterSheet);
+          console.log('Character sheet created:', data.characterSheet);
+          console.log('Generated avatars count:', data.characterSheet?.generatedAvatars?.length || 0);
+          console.log('Generated avatars:', data.characterSheet?.generatedAvatars);
+          toast.success("Character styles created! Choose your favorite.");
+          
+          // Automatically move to next step after successful character creation
+          if (currentStep === 2) {
+            setCurrentStep(3);
+          }
+        } catch (error: any) {
+          handleCharacterCreationError(error);
+        } finally {
+          setIsCreatingCharacter(false);
         }
-
-        setCharacterSheet(data.characterSheet);
-        console.log('Character sheet created:', data.characterSheet);
-        console.log('Generated avatars count:', data.characterSheet?.generatedAvatars?.length || 0);
-        console.log('Generated avatars:', data.characterSheet?.generatedAvatars);
-        toast.success("Character styles created! Choose your favorite.");
-        
-        // Automatically move to next step after successful character creation
-        if (currentStep === 2) {
-          setCurrentStep(3);
-        }
+      };
+      
+      reader.onerror = () => {
+        const error = new Error("Failed to read image file");
+        handleCharacterCreationError(error);
+        setIsCreatingCharacter(false);
       };
       
       reader.readAsDataURL(formData.photo);
     } catch (error: any) {
-      console.error('Error creating character sheet:', error);
-      
-      // Handle rate limiting and API errors more gracefully
-      if (error.message?.includes('Too Many Requests') || 
-          error.message?.includes('rate limit') || 
-          error.message?.includes('insufficient_quota') ||
-          error.message?.includes('billing') ||
-          error.message?.includes('429')) {
-        toast.error("OpenAI API rate limit reached. Please wait a few minutes before trying again, or skip the photo feature for now.");
-      } else if (error.message?.includes('Unexpected token')) {
-        toast.error("Character analysis failed. The AI response format was invalid.");
-      } else {
-        toast.error(error.message || "Failed to create character. This might be due to OpenAI API limits.");
-      }
-      
-      // Don't reset anything, just show the error and let user choose next action
-    } finally {
+      handleCharacterCreationError(error);
       setIsCreatingCharacter(false);
     }
+  };
+
+  const handleCharacterCreationError = (error: any) => {
+    console.error('Error creating character sheet:', error);
+    
+    let errorMessage = "Failed to create character. This might be due to OpenAI API limits.";
+    
+    // Handle rate limiting and API errors more gracefully
+    if (error.message?.includes('Too Many Requests') || 
+        error.message?.includes('rate limit') || 
+        error.message?.includes('insufficient_quota') ||
+        error.message?.includes('billing') ||
+        error.message?.includes('429')) {
+      errorMessage = "OpenAI API rate limit reached. You may need to add billing to your OpenAI account or wait before trying again.";
+    } else if (error.message?.includes('Unexpected token')) {
+      errorMessage = "Character analysis failed. The AI response format was invalid.";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    toast.error(errorMessage);
+    setCharacterCreationError(errorMessage);
   };
 
   const skipPhotoFeature = () => {
@@ -459,17 +479,48 @@ const CreateStory = () => {
               
               {formData.photo && !characterSheet && (
                 <div className="mt-6 space-y-4">
-                  <Button
-                    onClick={() => createCharacterSheet()}
-                    disabled={isCreatingCharacter}
-                    className="w-full"
-                  >
-                    {isCreatingCharacter ? (
-                      <>Creating Character Styles...</>
-                    ) : (
-                      <>Create Cartoon Character</>
-                    )}
-                  </Button>
+                  {characterCreationError && (
+                    <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <p className="text-sm font-medium text-destructive mb-2">❌ Character Creation Failed</p>
+                      <p className="text-xs text-destructive/80 mb-3">{characterCreationError}</p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setCharacterCreationError(null);
+                            createCharacterSheet();
+                          }}
+                          disabled={isCreatingCharacter}
+                          size="sm"
+                        >
+                          Try Again
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={skipPhotoFeature}
+                          disabled={isCreatingCharacter}
+                          size="sm"
+                        >
+                          Skip Photo Feature
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!characterCreationError && (
+                    <Button
+                      onClick={() => createCharacterSheet()}
+                      disabled={isCreatingCharacter}
+                      className="w-full"
+                    >
+                      {isCreatingCharacter ? (
+                        <>Creating Character Styles...</>
+                      ) : (
+                        <>Create Cartoon Character</>
+                      )}
+                    </Button>
+                  )}
+                  
                   <div className="text-center space-y-3">
                     <p className="text-xs text-muted-foreground">
                       This will analyze the photo and create cartoon versions
@@ -479,14 +530,16 @@ const CreateStory = () => {
                       <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
                         Photo features require OpenAI API credits. If you haven't added billing to your OpenAI account, this will fail.
                       </p>
-                      <Button
-                        variant="outline"
-                        onClick={skipPhotoFeature}
-                        disabled={isCreatingCharacter}
-                        className="w-full"
-                      >
-                        Skip Photo Feature & Continue
-                      </Button>
+                      {!characterCreationError && (
+                        <Button
+                          variant="outline"
+                          onClick={skipPhotoFeature}
+                          disabled={isCreatingCharacter}
+                          className="w-full"
+                        >
+                          Skip Photo Feature & Continue
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
