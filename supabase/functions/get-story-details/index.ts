@@ -43,16 +43,48 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Fetch story
-    const { data: story, error: storyError } = await supabase
-      .from("stories")
-      .select("*")
-      .eq("id", storyId)
-      .maybeSingle();
+    // Fetch story and run other queries in parallel
+    const [
+      { data: story, error: storyError },
+      { data: pages, error: pagesError },
+      { data: generations, error: genError }
+    ] = await Promise.all([
+      supabase
+        .from("stories")
+        .select("*")
+        .eq("id", storyId)
+        .maybeSingle(),
+      supabase
+        .from("story_pages")
+        .select("id, page_number, page_type, text_content, image_url, image_prompt")
+        .eq("story_id", storyId)
+        .order("page_number"),
+      supabase
+        .from("story_generations")
+        .select("id, generation_type, status, error_message, created_at")
+        .eq("story_id", storyId)
+        .order("created_at", { ascending: false })
+    ]);
 
     if (storyError) {
       console.error("get-story-details: storyError", storyError);
       return new Response(JSON.stringify({ error: storyError.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (pagesError) {
+      console.error("get-story-details: pagesError", pagesError);
+      return new Response(JSON.stringify({ error: pagesError.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (genError) {
+      console.error("get-story-details: genError", genError);
+      return new Response(JSON.stringify({ error: genError.message }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -65,14 +97,12 @@ serve(async (req) => {
       );
     }
 
-    // Optional character sheet
+    // Fetch character sheet only if needed
     let character_sheets: any = null;
     if (story.character_sheet_id) {
       const { data: sheet, error: sheetError } = await supabase
         .from("character_sheets")
-        .select(
-          "name, hair_color, hair_style, eye_color, skin_tone, typical_outfit, cartoon_reference_url"
-        )
+        .select("name, hair_color, hair_style, eye_color, skin_tone, typical_outfit, cartoon_reference_url")
         .eq("id", story.character_sheet_id)
         .maybeSingle();
 
@@ -80,38 +110,6 @@ serve(async (req) => {
         console.warn("get-story-details: sheetError", sheetError);
       }
       character_sheets = sheet ?? null;
-    }
-
-    // Fetch pages
-    const { data: pages, error: pagesError } = await supabase
-      .from("story_pages")
-      .select(
-        "id, page_number, page_type, text_content, image_url, image_prompt"
-      )
-      .eq("story_id", storyId)
-      .order("page_number");
-
-    if (pagesError) {
-      console.error("get-story-details: pagesError", pagesError);
-      return new Response(JSON.stringify({ error: pagesError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch generations
-    const { data: generations, error: genError } = await supabase
-      .from("story_generations")
-      .select("id, generation_type, status, error_message, created_at")
-      .eq("story_id", storyId)
-      .order("created_at", { ascending: false });
-
-    if (genError) {
-      console.error("get-story-details: genError", genError);
-      return new Response(JSON.stringify({ error: genError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     const payload = {
