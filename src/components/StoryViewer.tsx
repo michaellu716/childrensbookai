@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,22 +47,28 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   const [isPolling, setIsPolling] = useState(false);
   const [retryingIllustrations, setRetryingIllustrations] = useState(false);
 
+  const POLL_INTERVAL = 5000;
+  const pollTimeoutRef = useRef<number | null>(null);
+  const isFetchingRef = useRef(false);
+  const isMountedRef = useRef(true);
+
   useEffect(() => {
     fetchStory();
   }, [storyId]);
 
   useEffect(() => {
-    if (story?.status === 'generating') {
-      const interval = setInterval(() => {
-        setIsPolling(true);
-        fetchStory();
-      }, 3000);
-
-      return () => clearInterval(interval);
-    }
-  }, [story?.status]);
+    return () => {
+      isMountedRef.current = false;
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchStory = async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     try {
       // Fetch story details
       const { data: storyData, error: storyError } = await supabase
@@ -111,16 +117,29 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
       setStory(storyData);
       setPages(pagesData || []);
       setGenerations(generationsData || []);
-      
-      if (storyData.status !== 'generating') {
+
+      // Polling control
+      if (storyData.status === 'generating') {
+        setIsPolling(true);
+        if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = window.setTimeout(() => {
+          if (!isMountedRef.current) return;
+          fetchStory();
+        }, POLL_INTERVAL);
+      } else {
         setIsPolling(false);
+        if (pollTimeoutRef.current) {
+          clearTimeout(pollTimeoutRef.current);
+          pollTimeoutRef.current = null;
+        }
       }
-      
+
     } catch (error: any) {
       console.error('Error fetching story:', error);
       toast.error('Failed to load story');
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   };
 
