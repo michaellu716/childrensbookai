@@ -88,7 +88,8 @@ IMPORTANT:
 - Return ONLY the JSON object, no other text
 - Make ${childName} the main character in every scene
 - Age-appropriate for ${childAge} children
-- Each page should have 1-3 sentences of text (keep it simple)
+- Each page should have 2-3 sentences of text (no single sentence pages)
+- Create engaging, descriptive text that tells a complete story moment
 - Scene descriptions should be detailed enough for consistent illustration
 - Reading level: ${storySettings.readingLevel || 'early reader'}`
           },
