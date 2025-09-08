@@ -121,7 +121,7 @@ serve(async (req) => {
 
 async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   const startTime = Date.now();
-  const MAX_PROCESSING_TIME = 8000; // 8 seconds max to avoid CPU timeout
+  console.log(`Starting lightweight PDF generation for ${pages.length} pages`);
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -144,20 +144,18 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     if (childName) {
       page.drawText(childName, { x: 50, y: height - 140, size: 14, font, color: rgb(0.2, 0.2, 0.2) });
     }
+    
+    // Note about images
+    page.drawText('Note: This is a text-only version. Images not included for faster generation.', {
+      x: 50, y: height - 180, size: 10, font, color: rgb(0.5, 0.5, 0.5)
+    });
   }
 
-  // Limit to first 10 pages to prevent CPU timeout
-  const limitedPages = pages.slice(0, 10);
-  console.log(`Processing ${limitedPages.length} pages for PDF`);
-
+  // Process pages - text only for speed
+  const limitedPages = pages.slice(0, 12); // Limit pages
+  
   for (let i = 0; i < limitedPages.length; i++) {
     const p = limitedPages[i];
-    
-    // Check if we're running out of time
-    if (Date.now() - startTime > MAX_PROCESSING_TIME) {
-      console.warn(`PDF generation timeout after ${i} pages, generating partial PDF`);
-      break;
-    }
     
     const page = pdfDoc.addPage([612, 792]);
     const { width, height } = page.getSize();
@@ -172,41 +170,25 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
       font: fontBold,
       color: rgb(0.3, 0.3, 0.3),
     });
-    cursorY -= 20;
+    cursorY -= 40;
 
-    // Optional image with optimized processing
-    if (p.image_url && Date.now() - startTime < MAX_PROCESSING_TIME - 2000) {
-      try {
-        const embedded = await embedImageOptimized(pdfDoc, p.image_url);
-        if (embedded) {
-          const maxW = width - margin * 2;
-          const maxH = 300;
-          const scale = Math.min(maxW / embedded.width, maxH / embedded.height, 1); // Don't upscale
-          const drawW = embedded.width * scale;
-          const drawH = embedded.height * scale;
-
-          page.drawImage(embedded.image, {
-            x: margin + (maxW - drawW) / 2,
-            y: cursorY - drawH,
-            width: drawW,
-            height: drawH,
-          });
-          cursorY -= drawH + 20;
-        }
-      } catch (e) {
-        console.warn(`Failed to embed image for page ${p.page_number}:`, e);
-        // Continue without image rather than failing
-      }
-    }
-
-    // Text content with wrapping
+    // Text content only - no images to avoid CPU timeout
     if (p.text_content) {
       cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 20);
     }
+    
+    // If there was an image, just mention it
+    if (p.image_url) {
+      cursorY -= 20;
+      page.drawText('[Image would appear here in full version]', {
+        x: margin, y: cursorY, size: 10, font, color: rgb(0.6, 0.6, 0.6)
+      });
+    }
   }
 
-  console.log(`PDF generation completed in ${Date.now() - startTime}ms`);
-  return await pdfDoc.save();
+  const pdfBytes = await pdfDoc.save();
+  console.log(`Lightweight PDF generation completed in ${Date.now() - startTime}ms`);
+  return pdfBytes;
 }
 
 async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
