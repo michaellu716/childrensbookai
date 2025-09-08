@@ -381,18 +381,21 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     }
   };
 
-  const startEditing = (pageId: string, currentText: string) => {
+  const startEditing = (pageId: string, currentText: string | null | undefined) => {
+    console.log('[StoryViewer] Start editing page', { pageId });
     setEditingPageId(pageId);
-    setEditingText(currentText);
+    setEditingText(currentText ?? '');
   };
 
   const cancelEditing = () => {
+    console.log('[StoryViewer] Cancel editing');
     setEditingPageId(null);
     setEditingText('');
   };
 
   const savePageText = async () => {
     if (!editingPageId) return;
+    console.log('[StoryViewer] Saving page text', { editingPageId, length: editingText.length });
     
     setIsSaving(true);
     try {
