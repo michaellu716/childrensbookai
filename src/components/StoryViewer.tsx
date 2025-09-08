@@ -142,6 +142,18 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
     };
   }, []);
 
+  // Auto-play text when page changes
+  useEffect(() => {
+    if (ttsSupported && pages.length > 0 && pages[currentPage]?.text_content) {
+      // Small delay to ensure page transition is smooth
+      const timer = setTimeout(() => {
+        speak(pages[currentPage].text_content);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentPage, pages, ttsSupported, speak]);
+
   const fetchStory = async (retryCount = 0) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
