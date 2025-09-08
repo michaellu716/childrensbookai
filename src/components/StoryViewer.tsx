@@ -746,7 +746,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
       {/* Page Display */}
       {currentPageData && (
         <Card className="overflow-hidden">
-          <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-secondary/10 relative">
+          <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-secondary/10 relative mb-0">
             <LazyImage
               pageId={currentPageData.id}
               loadImage={loadPageImage}
@@ -762,7 +762,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
           
           {/* Text Content */}
           {currentPageData.text_content && (
-            <div className="px-6 pt-3 pb-6 bg-background">
+            <div className="px-6 py-4 bg-background -mt-1">
               {editingPageId === currentPageData.id ? (
                 <div className="space-y-4">
                   <Textarea
