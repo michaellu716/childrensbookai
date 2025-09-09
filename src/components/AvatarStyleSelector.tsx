@@ -113,17 +113,6 @@ export const AvatarStyleSelector: React.FC<AvatarStyleSelectorProps> = ({
           </Card>
         ))}
       </div>
-      
-      {selectedStyle && (
-        <div className="text-center">
-          <Button
-            onClick={() => onStyleSelect(selectedStyle)}
-            className="mt-4"
-          >
-            Continue with {selectedStyle.style.replace('-style', '').replace(' cartoon', '')} Style
-          </Button>
-        </div>
-      )}
     </div>
   );
 };
