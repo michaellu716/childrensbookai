@@ -81,7 +81,10 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
                 size="lg" 
-                onClick={() => navigate('/create')} 
+                onClick={() => {
+                  localStorage.removeItem('createStoryState');
+                  navigate('/create');
+                }} 
                 className="text-lg px-10 py-6 shadow-glow hover:shadow-glow/80 transition-all"
               >
                 Start Creating
@@ -168,7 +171,10 @@ const Index = () => {
                 <Button 
                   size="lg" 
                   variant="secondary"
-                  onClick={() => navigate('/create')}
+                  onClick={() => {
+                    localStorage.removeItem('createStoryState');
+                    navigate('/create');
+                  }}
                   className="text-lg px-10 py-6 shadow-xl"
                 >
                   <Sparkles className="mr-2 h-5 w-5" />
