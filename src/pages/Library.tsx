@@ -112,29 +112,13 @@ const Library = () => {
       if (error) throw error;
       
       if (data?.story && data?.pages) {
-        // Fetch page illustrations from story_generations table
-        const { data: generationsData } = await supabase
-          .from('story_generations')
-          .select('page_number, generation_result')
-          .eq('story_id', storyId)
-          .eq('generation_type', 'illustration')
-          .eq('status', 'completed');
-
-        // Create a map of page illustrations
-        const illustrationsMap = new Map();
-        generationsData?.forEach((gen: any) => {
-          if (gen.generation_result?.image_url) {
-            illustrationsMap.set(gen.page_number, gen.generation_result.image_url);
-          }
-        });
-
-        // Combine story data with pages and illustrations
+        // Transform the data to match what the print component expects
         const storyWithPages = {
           ...data.story,
           pages: data.pages.map((page: any) => ({
             ...page,
             content: page.text_content,
-            illustration_url: illustrationsMap.get(page.page_number) || null
+            illustration_url: page.image_url // Use the image_url from story_pages table
           }))
         };
 
