@@ -23,6 +23,7 @@ export type Database = {
           hair_color: string | null
           hair_style: string | null
           id: string
+          likes: number
           name: string
           photo_url: string | null
           skin_tone: string | null
@@ -37,6 +38,7 @@ export type Database = {
           hair_color?: string | null
           hair_style?: string | null
           id?: string
+          likes?: number
           name: string
           photo_url?: string | null
           skin_tone?: string | null
@@ -51,6 +53,7 @@ export type Database = {
           hair_color?: string | null
           hair_style?: string | null
           id?: string
+          likes?: number
           name?: string
           photo_url?: string | null
           skin_tone?: string | null

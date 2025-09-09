@@ -8,6 +8,7 @@ import Landing from "./pages/Landing";
 import CreateStory from "./pages/CreateStory";
 import ReviewStory from "./pages/ReviewStory";
 import Library from "./pages/Library";
+import Characters from "./pages/Characters";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthGuard } from "./components/AuthGuard";
@@ -41,6 +42,11 @@ const App = () => (
           <Route path="/library" element={
             <AuthGuard>
               <Library />
+            </AuthGuard>
+          } />
+          <Route path="/characters" element={
+            <AuthGuard>
+              <Characters />
             </AuthGuard>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

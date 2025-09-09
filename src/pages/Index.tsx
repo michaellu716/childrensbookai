@@ -51,6 +51,10 @@ const Index = () => {
                 <BookOpen className="mr-2 h-4 w-4" />
                 My Library
               </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/characters')} className="font-medium">
+                <Users className="mr-2 h-4 w-4" />
+                Characters
+              </Button>
               <Button variant="outline" size="sm" onClick={handleSignOut} className="font-medium">
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
@@ -228,14 +232,14 @@ const Index = () => {
               </div>
             </Card>
 
-            <Card className="group p-8 bg-gradient-card border-0 shadow-card hover:shadow-glow/20 transition-all">
+            <Card className="group p-8 bg-gradient-card border-0 shadow-card hover:shadow-glow/20 transition-all cursor-pointer" onClick={() => navigate('/characters')}>
               <div className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-primary/20 transition-colors">
                   <Users className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Multiple Characters</h3>
-                <p className="text-muted-foreground mb-6 leading-relaxed">Add friends, family members, or pets as characters in your stories</p>
-                <Button variant="outline" className="w-full group-hover:shadow-lg transition-shadow">Learn More</Button>
+                <h3 className="text-xl font-semibold mb-3">Character Gallery</h3>
+                <p className="text-muted-foreground mb-6 leading-relaxed">Browse and like all the amazing characters created in your stories</p>
+                <Button className="w-full group-hover:shadow-lg transition-shadow">View Characters</Button>
               </div>
             </Card>
 

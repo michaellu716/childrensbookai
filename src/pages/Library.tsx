@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Loader2, AlertCircle, Printer, Star } from "lucide-react";
+import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Loader2, AlertCircle, Printer, Star, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useReactToPrint } from 'react-to-print';
@@ -290,10 +290,16 @@ const Library = () => {
               <div className="hidden sm:block h-6 w-px bg-border/50"></div>
               <h1 className="text-2xl font-bold text-gradient">My Library</h1>
             </div>
-            <Button onClick={() => navigate('/create')} className="shadow-glow hover:shadow-glow/80 transition-all">
-              <Plus className="mr-2 h-4 w-4" />
-              Create New Story
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" onClick={() => navigate('/characters')} className="shadow-card hover:shadow-glow/20 transition-all">
+                <Users className="mr-2 h-4 w-4" />
+                Characters
+              </Button>
+              <Button onClick={() => navigate('/create')} className="shadow-glow hover:shadow-glow/80 transition-all">
+                <Plus className="mr-2 h-4 w-4" />
+                Create New Story
+              </Button>
+            </div>
           </div>
         </div>
       </header>
