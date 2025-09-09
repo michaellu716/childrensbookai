@@ -118,7 +118,7 @@ const Library = () => {
           pages: data.pages.map((page: any) => ({
             ...page,
             content: page.text_content,
-            illustration_url: page.image_url // Use the image_url from story_pages table
+            illustration_url: page.image_url // This should now be available from the API
           }))
         };
 
@@ -531,6 +531,14 @@ const Library = () => {
                           src={page.illustration_url} 
                           alt={`Illustration for page ${index + 1}`}
                           className="max-w-full h-auto max-h-96 mx-auto rounded-lg shadow-sm"
+                          onError={(e) => {
+                            // Hide broken images gracefully
+                            e.currentTarget.style.display = 'none';
+                          }}
+                          onLoad={(e) => {
+                            // Ensure image is visible when loaded successfully
+                            e.currentTarget.style.display = 'block';
+                          }}
                         />
                       </div>
                     )}

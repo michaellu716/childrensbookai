@@ -56,7 +56,7 @@ serve(async (req) => {
         .maybeSingle(),
       supabase
         .from("story_pages")
-        .select("id, page_number, page_type, text_content, image_prompt")
+        .select("id, page_number, page_type, text_content, image_prompt, image_url")
         .eq("story_id", storyId)
         .order("page_number"),
       supabase
