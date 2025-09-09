@@ -922,18 +922,6 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
           )}
           Download PDF
         </Button>
-        <Button variant="outline" onClick={handleShare}>
-          <Share2 className="h-4 w-4 mr-2" />
-          Share Story
-        </Button>
-        {currentPageData?.image_url && (
-          <Button 
-            variant="outline"
-            onClick={() => regeneratePage(currentPageData.id)}
-          >
-            Regenerate Page
-          </Button>
-        )}
       </div>
     </div>
   );

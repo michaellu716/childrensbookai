@@ -294,14 +294,6 @@ const ReviewStory = () => {
                             <Edit3 className="mr-2 h-4 w-4" />
                             Edit
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => regeneratePage(index)}
-                          >
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Regenerate
-                          </Button>
                         </div>
                       </div>
                     )}
