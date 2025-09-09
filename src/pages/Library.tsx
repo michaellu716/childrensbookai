@@ -22,6 +22,7 @@ interface Story {
   updated_at: string;
   user_id: string;
   likes: number;
+  first_page_image?: string;
 }
 
 const Library = () => {
@@ -39,13 +40,35 @@ const Library = () => {
 
   const fetchStories = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: storiesData, error } = await supabase
         .from('stories')
         .select('id, title, child_name, child_age, themes, art_style, length, created_at, status, updated_at, user_id, likes')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setStories(data || []);
+      
+      // Fetch first page images for each story
+      const storiesWithImages = await Promise.all(
+        (storiesData || []).map(async (story) => {
+          try {
+            const { data: firstPage } = await supabase
+              .from('story_pages')
+              .select('image_url')
+              .eq('story_id', story.id)
+              .eq('page_number', 1)
+              .single();
+            
+            return {
+              ...story,
+              first_page_image: firstPage?.image_url || null
+            };
+          } catch {
+            return { ...story, first_page_image: null };
+          }
+        })
+      );
+      
+      setStories(storiesWithImages);
     } catch (error) {
       console.error('Error fetching stories:', error);
       toast.error('Failed to load your stories');
@@ -135,45 +158,6 @@ const Library = () => {
     }
   };
 
-  const handleDuplicate = async (storyId: string) => {
-    try {
-      const { data: originalStory } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('id', storyId)
-        .single();
-
-      if (originalStory) {
-        const { data: newStory, error } = await supabase
-          .from('stories')
-          .insert({
-            title: `${originalStory.title} (Copy)`,
-            prompt: originalStory.prompt,
-            child_name: originalStory.child_name,
-            child_age: originalStory.child_age,
-            themes: originalStory.themes,
-            lesson: originalStory.lesson,
-            tone: originalStory.tone,
-            art_style: originalStory.art_style,
-            reading_level: originalStory.reading_level,
-            language: originalStory.language,
-            length: originalStory.length,
-            status: 'draft',
-            user_id: originalStory.user_id
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        
-        toast.success('Story duplicated successfully!');
-        navigate(`/create?duplicate=${newStory.id}`);
-      }
-    } catch (error) {
-      console.error('Error duplicating story:', error);
-      toast.error('Failed to duplicate story');
-    }
-  };
 
   const handleDelete = async (storyId: string, storyTitle: string) => {
     if (!confirm(`Are you sure you want to delete "${storyTitle}"? This action cannot be undone.`)) {
@@ -367,7 +351,7 @@ const Library = () => {
           </div>
         </section>
 
-        {/* Stories Grid */}
+        {/* Stories Bookshelf */}
         <section className="mb-16">
           {filteredStories.length === 0 ? (
             <div className="max-w-2xl mx-auto">
@@ -391,124 +375,132 @@ const Library = () => {
               </Card>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {filteredStories.map((story) => (
-                <Card key={story.id} className="group overflow-hidden border-0 shadow-card hover:shadow-glow/20 transition-all duration-300 bg-gradient-card">
-                  {/* Header */}
-                  <div className="relative p-6 border-b border-border/30 bg-gradient-to-r from-primary/5 to-accent/5">
-                    <div className="absolute top-4 right-4">
-                      {getStatusBadge(story.status)}
+                <div key={story.id} className="group relative">
+                  {/* Book Cover */}
+                  <div className="relative bg-gradient-to-br from-primary/10 via-background to-accent/10 rounded-lg overflow-hidden shadow-card hover:shadow-glow/30 transition-all duration-500 transform hover:-translate-y-2 cursor-pointer border border-border/20"
+                       onClick={() => navigate(`/review?storyId=${story.id}`)}>
+                    
+                    {/* Book Spine Effect */}
+                    <div className="absolute left-0 top-0 w-2 h-full bg-gradient-to-b from-primary/60 to-primary/40 shadow-inner"></div>
+                    
+                    {/* Cover Image */}
+                    <div className="aspect-[3/4] relative overflow-hidden">
+                      {story.first_page_image ? (
+                        <img 
+                          src={story.first_page_image} 
+                          alt={`${story.title} cover`}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      
+                      {/* Fallback Cover Design */}
+                      <div className={`absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-6 text-center ${story.first_page_image ? 'hidden' : ''}`}>
+                        <BookOpen className="h-12 w-12 text-primary/60 mb-4" />
+                        <h3 className="font-bold text-lg leading-tight text-primary/80 line-clamp-3">{story.title}</h3>
+                      </div>
+                      
+                      {/* Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      
+                      {/* Status Badge */}
+                      <div className="absolute top-3 right-3 z-10">
+                        {getStatusBadge(story.status)}
+                      </div>
+                      
+                      {/* Like Button */}
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLike(story.id);
+                        }}
+                        className="absolute top-3 left-3 z-10 text-white hover:text-yellow-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20"
+                      >
+                        <Star className="h-4 w-4 fill-current" />
+                        <span className="ml-1 text-xs">{story.likes || 0}</span>
+                      </Button>
                     </div>
-                    <div className="pr-24">
-                      <h3 className="font-bold text-xl line-clamp-2 mb-2 group-hover:text-primary transition-colors">{story.title}</h3>
-                      <p className="text-muted-foreground font-medium">
-                        For {story.child_name}{story.child_age && `, age ${story.child_age}`}
-                      </p>
-                      <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-                        <span className="px-2 py-1 bg-primary/10 rounded-full">{story.length} pages</span>
-                        <span className="px-2 py-1 bg-accent/10 rounded-full">{story.art_style}</span>
+                    
+                    {/* Book Info Overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                      <h3 className="font-bold text-sm line-clamp-2 mb-1">{story.title}</h3>
+                      <p className="text-xs opacity-80 line-clamp-1">For {story.child_name}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs px-2 py-0.5 bg-white/20 rounded-full">{story.length}p</span>
+                        {story.themes?.slice(0, 2).map((theme) => (
+                          <span key={theme} className="text-xs px-2 py-0.5 bg-white/20 rounded-full">
+                            {theme}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   </div>
-
-                  {/* Content */}
-                  <div className="p-6">
-                    <div className="space-y-4">
-                      {/* Themes */}
-                      {story.themes && story.themes.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {story.themes.slice(0, 3).map((theme) => (
-                            <Badge key={theme} variant="outline" className="text-xs font-medium">
-                              {theme}
-                            </Badge>
-                          ))}
-                          {story.themes.length > 3 && (
-                            <Badge variant="outline" className="text-xs font-medium">
-                              +{story.themes.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="text-sm text-muted-foreground">
-                        Created {formatDate(story.created_at)}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="space-y-3 pt-2">
-                        <div className="flex items-center justify-between">
+                  
+                  {/* Action Buttons - Show on Hover */}
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
+                    <div className="flex gap-1 bg-background/95 backdrop-blur-sm rounded-full shadow-glow border border-border/50 p-1">
+                      {story.status === "completed" && (
+                        <>
                           <Button 
                             size="sm" 
                             variant="ghost"
-                            onClick={() => handleLike(story.id)}
-                            className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 flex items-center gap-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadPDF(story.id);
+                            }}
+                            title="Download PDF"
+                            className="h-8 w-8 p-0 hover:bg-primary/10"
                           >
-                            <Star className="h-4 w-4 fill-current" />
-                            {story.likes || 0}
-                          </Button>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="default"
-                            onClick={() => navigate(`/review?storyId=${story.id}`)}
-                            className="flex-1 group-hover:shadow-lg transition-all"
-                          >
-                            {story.status === "completed" ? "View" : story.status === "generating" ? "Check Progress" : "Continue"}
+                            <Download className="h-3 w-3" />
                           </Button>
                           <Button 
                             size="sm" 
-                            variant="outline"
-                            onClick={() => handleDuplicate(story.id)}
-                            title="Duplicate story"
-                            className="group-hover:shadow-lg transition-all"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePrintStory(story.id, story.title);
+                            }}
+                            title="Print story"
+                            className="h-8 w-8 p-0 hover:bg-primary/10"
                           >
-                            <Copy className="h-4 w-4" />
+                            <Printer className="h-3 w-3" />
                           </Button>
-                          {story.status === "completed" && (
-                            <>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleDownloadPDF(story.id)}
-                                title="Download PDF"
-                                className="group-hover:shadow-lg transition-all"
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handlePrintStory(story.id, story.title)}
-                                title="Print story"
-                                className="group-hover:shadow-lg transition-all"
-                              >
-                                <Printer className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleShare(story.id, story.title)}
-                                title="Share story"
-                                className="group-hover:shadow-lg transition-all"
-                              >
-                                <Share className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
                           <Button 
                             size="sm" 
-                            variant="outline"
-                            onClick={() => handleDelete(story.id, story.title)}
-                            className="text-destructive hover:text-destructive group-hover:shadow-lg transition-all"
-                            title="Delete story"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShare(story.id, story.title);
+                            }}
+                            title="Share story"
+                            className="h-8 w-8 p-0 hover:bg-primary/10"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Share className="h-3 w-3" />
                           </Button>
-                        </div>
-                      </div>
+                        </>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(story.id, story.title);
+                        }}
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Delete story"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
                   </div>
-                </Card>
+                </div>
               ))}
             </div>
           )}
