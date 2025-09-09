@@ -225,7 +225,7 @@ const Library = () => {
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={() => navigate('/')}>
                 <BookOpen className="mr-2 h-4 w-4" />
-                StoryDreams
+                StoryBookAI
               </Button>
               <div className="hidden sm:block h-6 w-px bg-border"></div>
               <h1 className="text-xl font-semibold">My Library</h1>

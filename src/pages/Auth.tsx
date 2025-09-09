@@ -103,7 +103,7 @@ const Auth = () => {
         <div className="text-center md:text-left space-y-6">
           <div className="flex items-center justify-center md:justify-start space-x-2 mb-6">
             <BookOpen className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">StoryForge</span>
+            <span className="text-2xl font-bold">StoryBookAI</span>
           </div>
 
           <h1 className="text-4xl md:text-5xl font-bold leading-tight">

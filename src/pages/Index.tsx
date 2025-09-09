@@ -37,7 +37,7 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <BookOpen className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">StoryForge</span>
+              <span className="text-2xl font-bold">StoryBookAI</span>
             </div>
             <div className="flex items-center space-x-4">
               {user && (

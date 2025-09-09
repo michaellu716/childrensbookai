@@ -39,7 +39,7 @@ const Landing = () => {
             <div className="flex items-center space-x-2">
               <BookOpen className="h-8 w-8 text-primary" />
               <span className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">
-                StoryDreams
+                StoryBookAI
               </span>
             </div>
             <div className="flex items-center space-x-4">
@@ -108,7 +108,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Why Parents Love StoryDreams
+              Why Parents Love StoryBookAI
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Create meaningful bedtime experiences that spark imagination and strengthen bonds
@@ -156,7 +156,7 @@ const Landing = () => {
             <div className="flex items-center justify-center space-x-2 mb-4">
               <BookOpen className="h-6 w-6 text-primary" />
               <span className="text-lg font-semibold bg-gradient-hero bg-clip-text text-transparent">
-                StoryDreams
+                StoryBookAI
               </span>
             </div>
             <p className="text-muted-foreground">
