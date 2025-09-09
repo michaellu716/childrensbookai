@@ -27,6 +27,7 @@ const fetchStoriesWithImages = async (): Promise<Story[]> => {
       story_pages!inner(image_url)
     `)
     .eq('story_pages.page_number', 1)
+    .order('likes', { ascending: false })
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -45,6 +46,7 @@ const fetchStoriesBasic = async (): Promise<Story[]> => {
   const { data: storiesData, error } = await supabase
     .from('stories')
     .select('id, title, child_name, child_age, themes, art_style, length, created_at, status, updated_at, user_id, likes')
+    .order('likes', { ascending: false })
     .order('created_at', { ascending: false });
 
   if (error) throw error;

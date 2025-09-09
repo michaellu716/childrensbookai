@@ -21,6 +21,7 @@ const fetchCharacters = async (): Promise<Character[]> => {
   const { data: charactersData, error } = await supabase
     .from('character_sheets')
     .select('*')
+    .order('likes', { ascending: false })
     .order('created_at', { ascending: false });
 
   if (error) throw error;

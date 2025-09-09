@@ -98,6 +98,6 @@ export const CharacterCard = ({ character, onLike }: CharacterCardProps) => {
             Created {formatDate(character.created_at)}
           </p>
         </div>
-      </Card>
-    );
-  };
+    </Card>
+  );
+};
