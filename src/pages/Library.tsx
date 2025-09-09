@@ -25,10 +25,12 @@ const Library = () => {
 
   const { data: stories = [], isLoading, error } = useStoriesQuery();
 
-  if (error) {
-    console.error('Error fetching stories:', error);
-    toast.error('Failed to load your stories');
-  }
+  useEffect(() => {
+    if (error) {
+      console.error('Error fetching stories:', error);
+      toast.error('Failed to load your stories');
+    }
+  }, [error]);
 
   // Memoize expensive computations without side effects
   const { filteredStories, statusCounts, totalCharacters } = useMemo(() => {
@@ -66,8 +68,14 @@ const Library = () => {
       return matchesSearch && matchesFilter;
     });
     
+    const sorted = filtered.slice().sort((a, b) => {
+      const likeDiff = (b.likes || 0) - (a.likes || 0);
+      if (likeDiff !== 0) return likeDiff;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    
     return {
-      filteredStories: filtered,
+      filteredStories: sorted,
       statusCounts: counts,
       totalCharacters: uniqueCharacters.size
     };
@@ -79,6 +87,10 @@ const Library = () => {
   // Reset to page 1 when filters change (in useEffect to avoid infinite renders)
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+    // Also normalize invalid page states when there are zero pages
+    if (totalPages === 0 && currentPage !== 1) {
       setCurrentPage(1);
     }
   }, [filteredStories.length, currentPage, totalPages]);

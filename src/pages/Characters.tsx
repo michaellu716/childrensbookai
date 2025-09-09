@@ -20,22 +20,32 @@ const Characters = () => {
 
   const { data: characters = [], isLoading, error } = useCharactersQuery();
 
-  if (error) {
-    console.error('Error fetching characters:', error);
-    toast.error('Failed to load characters');
-  }
+  useEffect(() => {
+    if (error) {
+      console.error('Error fetching characters:', error);
+      toast.error('Failed to load characters');
+    }
+  }, [error]);
 
   // Memoize filtering without side effects
   const filteredCharacters = useMemo(() => {
-    if (!searchQuery) return characters;
-    
-    const lowerSearchQuery = searchQuery.toLowerCase();
-    return characters.filter(character => 
-      character.name?.toLowerCase().includes(lowerSearchQuery) ||
-      character.hair_color?.toLowerCase().includes(lowerSearchQuery) ||
-      character.eye_color?.toLowerCase().includes(lowerSearchQuery) ||
-      character.typical_outfit?.toLowerCase().includes(lowerSearchQuery)
-    );
+    const base = !searchQuery
+      ? [...characters]
+      : characters.filter(character => {
+          const q = searchQuery.toLowerCase();
+          return (
+            character.name?.toLowerCase().includes(q) ||
+            character.hair_color?.toLowerCase().includes(q) ||
+            character.eye_color?.toLowerCase().includes(q) ||
+            character.typical_outfit?.toLowerCase().includes(q)
+          );
+        });
+
+    return base.sort((a, b) => {
+      const likeDiff = (b.likes || 0) - (a.likes || 0);
+      if (likeDiff !== 0) return likeDiff;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
   }, [characters, searchQuery]);
 
   // Calculate pagination
