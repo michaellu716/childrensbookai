@@ -44,17 +44,21 @@ serve(async (req) => {
 
 Analyze the uploaded photo and extract these character features in JSON format:
 {
-  "hairColor": "descriptive color (e.g., golden blonde, dark brown, auburn)",
-  "hairStyle": "detailed style (e.g., curly shoulder-length, straight bob with bangs, messy wavy)",
-  "eyeColor": "specific color (e.g., bright blue, warm brown, green with gold flecks)",
-  "skinTone": "natural description (e.g., fair with rosy cheeks, warm medium, rich dark)",
+  "hairColor": "descriptive color (e.g., golden blonde, dark brown, auburn, black)",
+  "hairStyle": "detailed style (e.g., curly shoulder-length, straight bob with bangs, messy wavy, tight curls, braids)",
+  "hairTexture": "texture description (e.g., straight, wavy, curly, coily, kinky)",
+  "eyeColor": "specific color (e.g., bright blue, warm brown, green with gold flecks, dark brown, hazel)",
+  "eyeShape": "eye shape (e.g., almond-shaped, round, wide-set, narrow)",
+  "skinTone": "detailed skin description with ethnicity context (e.g., fair peachy European, warm golden Latino, rich brown African, olive Mediterranean, tan Asian)",
+  "facialStructure": "bone structure details (e.g., round cheeks, high cheekbones, broad nose, narrow nose, full lips, thin lips)",
+  "ethnicity": "apparent ethnic background (e.g., African American, Latino/Hispanic, Asian, Caucasian, Middle Eastern, Mixed)",
   "typicalOutfit": "child-appropriate clothing style (e.g., colorful t-shirt and jeans, flowy dress, overalls)",
   "accessory": "optional distinctive item (e.g., glasses, hair bow, favorite hat)",
-  "faceShape": "basic shape (round, oval, heart-shaped)",
-  "distinctiveFeatures": "notable characteristics (dimples, freckles, smile style)"
+  "faceShape": "basic shape (round, oval, heart-shaped, square)",
+  "distinctiveFeatures": "notable characteristics (dimples, freckles, smile style, birthmarks, unique features)"
 }
 
-Be specific and detailed to ensure consistent character generation. Focus on features that make this child unique.`
+CRITICAL: Pay very close attention to racial and ethnic characteristics. Be specific about skin tone, hair texture, facial structure, and ethnic features. This is essential for accurate character representation.`
           },
           {
             role: 'user',
@@ -111,13 +115,16 @@ Be specific and detailed to ensure consistent character generation. Focus on fea
     // Generate all avatars in parallel
     const avatarPromises = avatarStyles.map(async (style) => {
       const prompt = `Create a ${style} portrait of a child character based on these features:
-- Hair: ${characterFeatures.hairColor} ${characterFeatures.hairStyle}
-- Eyes: ${characterFeatures.eyeColor}
+- Hair: ${characterFeatures.hairColor} ${characterFeatures.hairStyle}${characterFeatures.hairTexture ? ` with ${characterFeatures.hairTexture} texture` : ''}
+- Eyes: ${characterFeatures.eyeColor}${characterFeatures.eyeShape ? ` ${characterFeatures.eyeShape} eyes` : ''}
 - Skin: ${characterFeatures.skinTone}
-- Face: ${characterFeatures.faceShape} face
+- Face: ${characterFeatures.faceShape} face${characterFeatures.facialStructure ? ` with ${characterFeatures.facialStructure}` : ''}
+- Ethnicity: ${characterFeatures.ethnicity || 'as shown in reference'}
 - Outfit: ${characterFeatures.typicalOutfit}
 ${characterFeatures.accessory ? `- Accessory: ${characterFeatures.accessory}` : ''}
 ${characterFeatures.distinctiveFeatures ? `- Features: ${characterFeatures.distinctiveFeatures}` : ''}
+
+IMPORTANT: Maintain authentic racial and ethnic representation. Keep skin tone, facial features, hair texture, and ethnic characteristics accurate to the description. 
 
 Style: ${style}, child-friendly, warm and appealing, suitable for a children's storybook, clean background, high quality illustration`;
 
