@@ -1,188 +1,31 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Search, Heart, Users, ArrowLeft, Sparkles, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Users, ArrowLeft, Sparkles, Loader2, ChevronLeft, ChevronRight, Library } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import catImage from "@/assets/characters/cat-1.jpg";
-import dogImage from "@/assets/characters/dog-1.jpg";
-import rabbitImage from "@/assets/characters/rabbit-1.jpg";
-import bearImage from "@/assets/characters/bear-1.jpg";
-import elephantImage from "@/assets/characters/elephant-1.jpg";
-import lionImage from "@/assets/characters/lion-1.jpg";
-import foxImage from "@/assets/characters/fox-1.jpg";
-import pandaImage from "@/assets/characters/panda-1.jpg";
+import { useCharactersQuery, type Character } from "@/hooks/useCharactersQuery";
+import { CharacterCard } from "@/components/CharacterCard";
+import { useQueryClient } from '@tanstack/react-query';
 
-interface Character {
-  id: string;
-  name: string;
-  hair_color?: string;
-  hair_style?: string;
-  eye_color?: string;
-  skin_tone?: string;
-  typical_outfit?: string;
-  accessory?: string;
-  cartoon_reference_url?: string;
-  likes: number;
-  created_at: string;
-  user_id: string;
-  story_count?: number;
-}
-
-const imageMap: Record<string, string> = {
-  'cat-1': catImage,
-  'dog-1': dogImage,
-  'rabbit-1': rabbitImage,
-  'bear-1': bearImage,
-  'elephant-1': elephantImage,
-  'lion-1': lionImage,
-  'fox-1': foxImage,
-  'panda-1': pandaImage,
-};
-
-const getCharacterImage = (url?: string): string | undefined => {
-  if (!url) return undefined;
-  if (url.startsWith('data:image')) return url;
-  return imageMap[url] || url;
-};
+const CHARACTERS_PER_PAGE = 24;
 
 const Characters = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [likedCharacters, setLikedCharacters] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalCharacters, setTotalCharacters] = useState(0);
-  const charactersPerPage = 24;
 
-  const getCharacterImage = (imageKey: string) => {
-    const imageMap: { [key: string]: string } = {
-      'cat-1': catImage,
-      'dog-1': dogImage,
-      'rabbit-1': rabbitImage,
-      'bear-1': bearImage,
-      'elephant-1': elephantImage,
-      'lion-1': lionImage,
-      'fox-1': foxImage,
-      'panda-1': pandaImage,
-    };
-    return imageMap[imageKey] || imageKey;
-  };
+  const { data: characters = [], isLoading, error } = useCharactersQuery();
 
-  useEffect(() => {
-    fetchCharacters(currentPage, searchQuery);
-  }, [currentPage]);
+  if (error) {
+    console.error('Error fetching characters:', error);
+    toast.error('Failed to load characters');
+  }
 
-  useEffect(() => {
-    setCurrentPage(1);
-    fetchCharacters(1, searchQuery);
-  }, [searchQuery]);
-
-  const fetchCharacters = async (page = 1, searchTerm = "") => {
-    try {
-      let charactersData, totalCount;
-
-      if (searchTerm) {
-        // For search, fetch all characters and filter client-side
-        const { data, error, count } = await supabase
-          .from('character_sheets')
-          .select(`
-            id, 
-            name, 
-            hair_color, 
-            hair_style, 
-            eye_color, 
-            skin_tone, 
-            typical_outfit, 
-            accessory, 
-            cartoon_reference_url, 
-            likes, 
-            created_at, 
-            user_id
-          `, { count: 'exact' })
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        charactersData = data;
-        totalCount = count;
-      } else {
-        // For normal browsing, use pagination
-        const { count } = await supabase
-          .from('character_sheets')
-          .select('*', { count: 'exact', head: true });
-        
-        setTotalCharacters(count || 0);
-
-        const from = (page - 1) * charactersPerPage;
-        const to = from + charactersPerPage - 1;
-
-        const { data, error } = await supabase
-          .from('character_sheets')
-          .select(`
-            id, 
-            name, 
-            hair_color, 
-            hair_style, 
-            eye_color, 
-            skin_tone, 
-            typical_outfit, 
-            accessory, 
-            cartoon_reference_url, 
-            likes, 
-            created_at, 
-            user_id
-          `)
-          .order('created_at', { ascending: false })
-          .range(from, to);
-
-        if (error) throw error;
-        charactersData = data;
-        totalCount = count;
-      }
-
-      // Get story count for each character
-      const charactersWithStoryCount = await Promise.all(
-        (charactersData || []).map(async (character) => {
-          try {
-            const { count } = await supabase
-              .from('stories')
-              .select('id', { count: 'exact', head: true })
-              .eq('character_sheet_id', character.id);
-            
-            return {
-              ...character,
-              story_count: count || 0
-            };
-          } catch {
-            return { ...character, story_count: 0 };
-          }
-        })
-      );
-
-      setCharacters(charactersWithStoryCount);
-      if (searchTerm) {
-        setTotalCharacters(totalCount || 0);
-      }
-    } catch (error) {
-      console.error('Error fetching characters:', error);
-      toast.error('Failed to load characters');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Memoize filtering without side effects
   const filteredCharacters = useMemo(() => {
     if (!searchQuery) return characters;
     
@@ -195,6 +38,23 @@ const Characters = () => {
     );
   }, [characters, searchQuery]);
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredCharacters.length / CHARACTERS_PER_PAGE);
+  
+  // Reset to page 1 when filters change (in useEffect to avoid infinite renders)
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [filteredCharacters.length, currentPage, totalPages]);
+
+  // Calculate paginated results
+  const paginatedCharacters = useMemo(() => {
+    const startIndex = (currentPage - 1) * CHARACTERS_PER_PAGE;
+    const endIndex = startIndex + CHARACTERS_PER_PAGE;
+    return filteredCharacters.slice(startIndex, endIndex);
+  }, [filteredCharacters, currentPage]);
+
   const handleLike = async (characterId: string) => {
     try {
       const character = characters.find(c => c.id === characterId);
@@ -202,28 +62,31 @@ const Characters = () => {
 
       const newLikes = character.likes + 1;
       
+      // Optimistic update
+      queryClient.setQueryData(['characters'], (oldData: Character[] | undefined) => 
+        oldData?.map(char => 
+          char.id === characterId 
+            ? { ...char, likes: newLikes }
+            : char
+        ) || []
+      );
+
       const { error } = await supabase
         .from('character_sheets')
         .update({ likes: newLikes })
         .eq('id', characterId);
 
-      if (error) throw error;
-
-      setCharacters(characters.map(char => 
-        char.id === characterId 
-          ? { ...char, likes: newLikes }
-          : char
-      ));
-
-      // Add to liked characters for animation
-      setLikedCharacters(prev => new Set(prev).add(characterId));
-      setTimeout(() => {
-        setLikedCharacters(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(characterId);
-          return newSet;
-        });
-      }, 1000);
+      if (error) {
+        // Revert optimistic update on error
+        queryClient.setQueryData(['characters'], (oldData: Character[] | undefined) => 
+          oldData?.map(char => 
+            char.id === characterId 
+              ? { ...char, likes: character.likes }
+              : char
+          ) || []
+        );
+        throw error;
+      }
 
       toast.success("Character liked! 💖");
     } catch (error) {
@@ -232,20 +95,31 @@ const Characters = () => {
     }
   };
 
-  const getCharacterTraits = (character: Character) => {
-    const traits = [];
-    if (character.hair_color) traits.push(`${character.hair_color} hair`);
-    if (character.eye_color) traits.push(`${character.eye_color} eyes`);
-    if (character.skin_tone) traits.push(character.skin_tone);
-    return traits;
+  const handleDelete = async (characterId: string, characterName: string) => {
+    if (!confirm(`Are you sure you want to delete "${characterName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('character_sheets')
+        .delete()
+        .eq('id', characterId);
+
+      if (error) throw error;
+      
+      toast.success('Character deleted successfully!');
+      // Invalidate and refetch characters
+      queryClient.invalidateQueries({ queryKey: ['characters'] });
+    } catch (error) {
+      console.error('Error deleting character:', error);
+      toast.error('Failed to delete character');
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+  const handleCharacterClick = (character: Character) => {
+    // Navigate to create story with this character pre-selected
+    navigate('/create', { state: { selectedCharacter: character } });
   };
 
   if (isLoading) {
@@ -281,10 +155,16 @@ const Characters = () => {
                 <h1 className="text-2xl font-bold text-gradient">Character Gallery</h1>
               </div>
             </div>
-            <Button onClick={() => navigate('/create')} className="shadow-glow hover:shadow-glow/80 transition-all">
-              <Sparkles className="mr-2 h-4 w-4" />
-              Create New Story
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" onClick={() => navigate('/library')} className="shadow-card hover:shadow-glow/20 transition-all">
+                <Library className="mr-2 h-4 w-4" />
+                My Library
+              </Button>
+              <Button onClick={() => navigate('/create')} className="shadow-glow hover:shadow-glow/80 transition-all">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Create New Story
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -314,20 +194,14 @@ const Characters = () => {
             {/* Stats */}
             <div className="flex justify-center gap-6 text-center">
               <div className="bg-gradient-card rounded-lg p-4 shadow-card">
-                <div className="text-2xl font-bold text-primary">{totalCharacters}</div>
+                <div className="text-2xl font-bold text-primary">{filteredCharacters.length}</div>
                 <div className="text-sm text-muted-foreground">Total Characters</div>
               </div>
               <div className="bg-gradient-card rounded-lg p-4 shadow-card">
                 <div className="text-2xl font-bold text-pink-500">
                   {characters.reduce((sum, char) => sum + char.likes, 0)}
                 </div>
-                <div className="text-sm text-muted-foreground">Page Likes</div>
-              </div>
-              <div className="bg-gradient-card rounded-lg p-4 shadow-card">
-                <div className="text-2xl font-bold text-accent">
-                  {characters.reduce((sum, char) => sum + (char.story_count || 0), 0)}
-                </div>
-                <div className="text-sm text-muted-foreground">Page Stories</div>
+                <div className="text-sm text-muted-foreground">Total Likes</div>
               </div>
             </div>
           </div>
@@ -357,133 +231,114 @@ const Characters = () => {
               </Card>
             </div>
           ) : (
-            <div>
-              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4">
-                {filteredCharacters.map((character) => (
-                  <Card 
-                    key={character.id} 
-                    className="group overflow-hidden bg-gradient-card border-0 shadow-card hover:shadow-glow/30 transition-all duration-500 transform hover:-translate-y-1"
-                  >
-                    {/* Character Image */}
-                    <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5">
-                    {character.cartoon_reference_url ? (
-                      <img
-                        src={getCharacterImage(character.cartoon_reference_url)}
-                        alt={character.name}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                        }}
-                      />
-                    ) : null}
-                      
-                      {/* Fallback Character Display */}
-                      <div className={`absolute inset-0 flex flex-col items-center justify-center p-2 text-center ${character.cartoon_reference_url ? 'hidden' : ''}`}>
-                        <div className="text-2xl mb-1">🎭</div>
-                        <h3 className="font-bold text-xs text-primary/80 line-clamp-2">{character.name}</h3>
-                      </div>
-                      
-                      {/* Like Button */}
-                      <Button 
-                        size="sm" 
-                        variant="ghost"
-                        onClick={() => handleLike(character.id)}
-                        className={`absolute top-1 right-1 z-10 text-white hover:text-pink-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 transition-all h-5 w-5 p-0 ${
-                          likedCharacters.has(character.id) ? 'animate-bounce scale-110' : ''
-                        }`}
-                      >
-                        <Heart className={`h-2 w-2 ${character.likes > 0 ? 'fill-pink-400 text-pink-400' : ''}`} />
-                      </Button>
+            <>
+              {/* Character Count and Pagination Info */}
+              <div className="flex justify-between items-center mb-6">
+                <p className="text-muted-foreground">
+                  Showing {paginatedCharacters.length} of {filteredCharacters.length} characters
+                </p>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground px-2">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
 
-                      {/* Story Count Badge */}
-                      {(character.story_count || 0) > 0 && (
-                        <Badge className="absolute top-1 left-1 bg-primary/80 text-primary-foreground text-xs px-1 py-0">
-                          {character.story_count}
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Character Info */}
-                    <div className="p-2">
-                      <div className="mb-2">
-                        <h3 className="text-xs font-bold mb-1 text-foreground line-clamp-1">{character.name}</h3>
-                        
-                        {getCharacterTraits(character).length > 0 && (
-                          <div className="mb-1">
-                            <Badge 
-                              variant="secondary" 
-                              className="text-xs bg-primary/10 text-primary border-primary/20 px-1 py-0"
-                            >
-                              {getCharacterTraits(character)[0].length > 6 ? getCharacterTraits(character)[0].substring(0, 6) + '..' : getCharacterTraits(character)[0]}
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex justify-between items-center text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Heart className="h-2 w-2 fill-pink-400 text-pink-400" />
-                          <span className="text-xs">{character.likes}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
+              {/* Character Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {paginatedCharacters.map((character) => (
+                  <CharacterCard
+                    key={character.id}
+                    character={character}
+                    onLike={handleLike}
+                    onDelete={handleDelete}
+                    onClick={handleCharacterClick}
+                  />
                 ))}
               </div>
 
-              {/* Pagination */}
-              {!searchQuery && totalCharacters > charactersPerPage && (
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
                 <div className="flex justify-center mt-8">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                        />
-                      </PaginationItem>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-2" />
+                      Previous
+                    </Button>
+                    
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let page;
+                      if (totalPages <= 5) {
+                        page = i + 1;
+                      } else if (currentPage <= 3) {
+                        page = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        page = totalPages - 4 + i;
+                      } else {
+                        page = currentPage - 2 + i;
+                      }
                       
-                      {Array.from({ length: Math.ceil(totalCharacters / charactersPerPage) }, (_, i) => i + 1)
-                        .filter(page => {
-                          const distance = Math.abs(page - currentPage);
-                          return distance <= 2 || page === 1 || page === Math.ceil(totalCharacters / charactersPerPage);
-                        })
-                        .map((page, index, visiblePages) => {
-                          const prevPage = visiblePages[index - 1];
-                          const showEllipsis = prevPage && page - prevPage > 1;
-                          
-                          return (
-                            <div key={page} className="flex items-center">
-                              {showEllipsis && (
-                                <PaginationItem>
-                                  <span className="px-3 py-2 text-muted-foreground">...</span>
-                                </PaginationItem>
-                              )}
-                              <PaginationItem>
-                                <PaginationLink
-                                  onClick={() => setCurrentPage(page)}
-                                  isActive={currentPage === page}
-                                  className="cursor-pointer"
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            </div>
-                          );
-                        })}
-                      
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => setCurrentPage(Math.min(Math.ceil(totalCharacters / charactersPerPage), currentPage + 1))}
-                          className={currentPage >= Math.ceil(totalCharacters / charactersPerPage) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Last
+                    </Button>
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           )}
         </section>
       </div>
