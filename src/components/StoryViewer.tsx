@@ -462,7 +462,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   };
 
   const nextPage = () => {
-    if (currentPage < pages.length - 1) {
+    const totalPages = pages.length + 1; // Include "The End" page
+    if (currentPage < totalPages - 1) {
       setCurrentPage(currentPage + 1);
       setEditingPageId(null); // Reset editing state when navigating
       setHasUserNavigated(true); // Mark as user navigation
@@ -730,6 +731,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
   }
 
   const currentPageData = pages[currentPage];
+  const isEndPage = currentPage >= pages.length;
+  const totalPages = pages.length + 1; // Add 1 for "The End" page
 
   return (
     <div className="space-y-6">
@@ -744,7 +747,28 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
       </div>
 
       {/* Page Display */}
-      {currentPageData && (
+      {isEndPage ? (
+        /* The End Page */
+        <Card className="overflow-hidden">
+          <div className="aspect-[4/3] bg-gradient-to-br from-primary/20 via-accent/10 to-primary/20 relative mb-0 flex items-center justify-center">
+            <div className="text-center space-y-6">
+              <div className="text-6xl mb-4">📖</div>
+              <h2 className="text-4xl font-bold text-primary mb-4">The End</h2>
+              <p className="text-lg text-muted-foreground italic">
+                We hope you enjoyed {story.child_name}'s magical adventure!
+              </p>
+              <div className="mt-8 text-sm text-muted-foreground">
+                ⭐ ⭐ ⭐
+              </div>
+            </div>
+            
+            {/* Page Number Indicator */}
+            <div className="absolute top-4 right-4 bg-black/60 text-white px-2 py-1 rounded">
+              {totalPages} / {totalPages}
+            </div>
+          </div>
+        </Card>
+      ) : currentPageData ? (
         <Card className="overflow-hidden">
           <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-secondary/10 relative mb-0">
             <LazyImage
@@ -756,7 +780,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
             
             {/* Page Number Indicator */}
             <div className="absolute top-4 right-4 bg-black/60 text-white px-2 py-1 rounded">
-              {currentPageData.page_number} / {pages.length}
+              {currentPageData.page_number} / {totalPages}
             </div>
           </div>
           
@@ -872,7 +896,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
             </div>
           )}
         </Card>
-      )}
+      ) : null}
 
       {/* Navigation */}
       <div className="flex justify-between items-center">
@@ -886,7 +910,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         </Button>
         
         <div className="flex gap-2">
-          {pages.map((_, index) => (
+          {Array.from({ length: totalPages }).map((_, index) => (
             <button
               key={index}
               onClick={() => {
@@ -905,7 +929,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         <Button
           variant="outline"
           onClick={nextPage}
-          disabled={currentPage === pages.length - 1}
+          disabled={currentPage === totalPages - 1}
         >
           Next
           <ChevronRight className="h-4 w-4 ml-2" />
