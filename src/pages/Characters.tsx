@@ -50,6 +50,20 @@ const Characters = () => {
   const [totalCharacters, setTotalCharacters] = useState(0);
   const charactersPerPage = 24;
 
+  const getCharacterImage = (imageKey: string) => {
+    const imageMap: { [key: string]: string } = {
+      'cat-1': catImage,
+      'dog-1': dogImage,
+      'rabbit-1': rabbitImage,
+      'bear-1': bearImage,
+      'elephant-1': elephantImage,
+      'lion-1': lionImage,
+      'fox-1': foxImage,
+      'panda-1': pandaImage,
+    };
+    return imageMap[imageKey] || imageKey;
+  };
+
   useEffect(() => {
     fetchCharacters(currentPage, searchQuery);
   }, [currentPage]);
@@ -335,17 +349,17 @@ const Characters = () => {
                   >
                     {/* Character Image */}
                     <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5">
-                      {character.cartoon_reference_url ? (
-                        <img
-                          src={character.cartoon_reference_url}
-                          alt={character.name}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
+                    {character.cartoon_reference_url ? (
+                      <img
+                        src={getCharacterImage(character.cartoon_reference_url)}
+                        alt={character.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
                       
                       {/* Fallback Character Display */}
                       <div className={`absolute inset-0 flex flex-col items-center justify-center p-2 text-center ${character.cartoon_reference_url ? 'hidden' : ''}`}>
