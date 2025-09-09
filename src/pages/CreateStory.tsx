@@ -41,15 +41,15 @@ const CreateStory = () => {
   // Debug logging
   console.log('CreateStory render:', { currentStep, isGenerating, formData });
 
-  // Persist minimal wizard state (avoid storing large images)
+  // Load saved form data but always start from step 1
   useEffect(() => {
-    console.log('Loading saved state from localStorage');
+    console.log('Loading saved form data from localStorage');
     try {
       const saved = localStorage.getItem('createStoryState');
       if (saved) {
         const state = JSON.parse(saved);
         console.log('Loaded state:', state);
-        if (state.currentStep) setCurrentStep(state.currentStep);
+        // Always start from step 1, but restore form data for user convenience
         if (state.formData) setFormData((prev) => ({ ...prev, ...state.formData, photo: null }));
       }
     } catch (e) {
