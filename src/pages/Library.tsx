@@ -1,84 +1,37 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Loader2, AlertCircle, Printer, Star, Users } from "lucide-react";
+import { BookOpen, Search, Plus, Download, Share, Trash2, Loader2, Printer, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useReactToPrint } from 'react-to-print';
+import { useStoriesQuery, type Story } from "@/hooks/useStoriesQuery";
+import { StoryCard } from "@/components/StoryCard";
+import { useQueryClient } from '@tanstack/react-query';
 
-interface Story {
-  id: string;
-  title: string;
-  child_name: string;
-  child_age: string;
-  themes: string[];
-  art_style: string;
-  length: number;
-  created_at: string;
-  status: string;
-  updated_at: string;
-  user_id: string;
-  likes: number;
-  first_page_image?: string;
-}
+const STORIES_PER_PAGE = 24;
 
 const Library = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
-  const [stories, setStories] = useState<Story[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const [storyContent, setStoryContent] = useState<any>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchStories();
-  }, []);
+  const { data: stories = [], isLoading, error } = useStoriesQuery();
 
-  const fetchStories = async () => {
-    try {
-      const { data: storiesData, error } = await supabase
-        .from('stories')
-        .select('id, title, child_name, child_age, themes, art_style, length, created_at, status, updated_at, user_id, likes')
-        .order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error fetching stories:', error);
+    toast.error('Failed to load your stories');
+  }
 
-      if (error) throw error;
-      
-      // Fetch first page images for each story
-      const storiesWithImages = await Promise.all(
-        (storiesData || []).map(async (story) => {
-          try {
-            const { data: firstPage } = await supabase
-              .from('story_pages')
-              .select('image_url')
-              .eq('story_id', story.id)
-              .eq('page_number', 1)
-              .maybeSingle();
-            
-            return {
-              ...story,
-              first_page_image: firstPage?.image_url || null
-            };
-          } catch {
-            return { ...story, first_page_image: null };
-          }
-        })
-      );
-      
-      setStories(storiesWithImages);
-    } catch (error) {
-      console.error('Error fetching stories:', error);
-      toast.error('Failed to load your stories');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Memoize expensive computations
-  const { filteredStories, statusCounts, totalCharacters } = useMemo(() => {
+  // Memoize expensive computations with pagination
+  const { filteredStories, paginatedStories, statusCounts, totalCharacters, totalPages } = useMemo(() => {
     const lowerSearchQuery = searchQuery.toLowerCase();
     
     // Calculate status counts once
@@ -112,13 +65,25 @@ const Library = () => {
       
       return matchesSearch && matchesFilter;
     });
+
+    // Reset to page 1 when filters change
+    if (currentPage > Math.ceil(filtered.length / STORIES_PER_PAGE)) {
+      setCurrentPage(1);
+    }
+
+    // Paginate results
+    const startIndex = (currentPage - 1) * STORIES_PER_PAGE;
+    const endIndex = startIndex + STORIES_PER_PAGE;
+    const paginated = filtered.slice(startIndex, endIndex);
     
     return {
       filteredStories: filtered,
+      paginatedStories: paginated,
       statusCounts: counts,
-      totalCharacters: uniqueCharacters.size
+      totalCharacters: uniqueCharacters.size,
+      totalPages: Math.ceil(filtered.length / STORIES_PER_PAGE)
     };
-  }, [stories, searchQuery, selectedFilter]);
+  }, [stories, searchQuery, selectedFilter, currentPage]);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -173,7 +138,8 @@ const Library = () => {
       if (error) throw error;
       
       toast.success('Story deleted successfully!');
-      fetchStories(); // Refresh the list
+      // Invalidate and refetch stories
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
     } catch (error) {
       console.error('Error deleting story:', error);
       toast.error('Failed to delete story');
@@ -217,18 +183,31 @@ const Library = () => {
 
       const newLikes = storyToUpdate.likes + 1;
       
+      // Optimistic update
+      queryClient.setQueryData(['stories'], (oldData: Story[] | undefined) => 
+        oldData?.map(story => 
+          story.id === storyId 
+            ? { ...story, likes: newLikes }
+            : story
+        ) || []
+      );
+
       const { error } = await supabase
         .from('stories')
         .update({ likes: newLikes })
         .eq('id', storyId);
 
-      if (error) throw error;
-
-      setStories(stories.map(story => 
-        story.id === storyId 
-          ? { ...story, likes: newLikes }
-          : story
-      ));
+      if (error) {
+        // Revert optimistic update on error
+        queryClient.setQueryData(['stories'], (oldData: Story[] | undefined) => 
+          oldData?.map(story => 
+            story.id === storyId 
+              ? { ...story, likes: storyToUpdate.likes }
+              : story
+          ) || []
+        );
+        throw error;
+      }
 
       toast.success("Story liked!");
     } catch (error) {
@@ -381,140 +360,108 @@ const Library = () => {
               </Card>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-              {filteredStories.map((story) => (
-                <div key={story.id} className="group relative">
-                  {/* Book Cover */}
-                  <div className="relative bg-gradient-to-br from-primary/10 via-background to-accent/10 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 transform hover:-translate-y-1 hover:rotate-1 cursor-pointer border border-border/20 perspective-1000"
-                       onClick={() => navigate(`/review?storyId=${story.id}`)}
-                       style={{
-                         transformStyle: 'preserve-3d',
-                         boxShadow: '0 8px 25px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1) inset'
-                       }}>
-                    
-                    {/* Book Spine Effect */}
-                    <div className="absolute left-0 top-0 w-1.5 h-full bg-gradient-to-b from-primary/70 to-primary/50 shadow-inner"></div>
-                    
-                    {/* Cover Image */}
-                    <div className="aspect-[2/3] relative overflow-hidden">
-                      {story.first_page_image ? (
-                        <img 
-                          src={story.first_page_image} 
-                          alt={`${story.title} cover`}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      
-                      {/* Fallback Cover Design */}
-                      <div className={`absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-4 text-center ${story.first_page_image ? 'hidden' : ''}`}>
-                        <BookOpen className="h-8 w-8 text-primary/60 mb-3" />
-                        <h3 className="font-bold text-sm leading-tight text-primary/80 line-clamp-2">{story.title}</h3>
-                      </div>
-                      
-                      {/* Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      
-                      {/* Status Badge */}
-                      <div className="absolute top-2 right-2 z-10">
-                        {getStatusBadge(story.status)}
-                      </div>
-                      
-                      {/* Like Button */}
-                      <Button 
-                        size="sm" 
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLike(story.id);
-                        }}
-                        className="absolute top-2 left-2 z-10 text-white hover:text-yellow-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 h-7 w-7 p-0"
-                      >
-                        <Star className="h-3 w-3 fill-current" />
-                        <span className="ml-1 text-xs hidden group-hover:inline">{story.likes || 0}</span>
-                      </Button>
-                    </div>
-                    
-                    {/* Book Info Overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-white transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
-                      <h3 className="font-bold text-xs line-clamp-2 mb-1">{story.title}</h3>
-                      <p className="text-xs opacity-80 line-clamp-1 mb-1">For {story.child_name}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs px-1.5 py-0.5 bg-white/20 rounded-full">{story.length}p</span>
-                        <div className="flex gap-1">
-                          {story.themes?.slice(0, 1).map((theme) => (
-                            <span key={theme} className="text-xs px-1.5 py-0.5 bg-white/20 rounded-full truncate max-w-16">
-                              {theme}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+            <>
+              {/* Story Count and Pagination Info */}
+              <div className="flex justify-between items-center mb-6">
+                <p className="text-muted-foreground">
+                  Showing {paginatedStories.length} of {filteredStories.length} stories
+                </p>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground px-2">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
-                  
-                  {/* Action Buttons - Show on Hover */}
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
-                    <div className="flex gap-1 bg-background/95 backdrop-blur-sm rounded-full shadow-glow border border-border/50 p-1">
-                      {story.status === "completed" && (
-                        <>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownloadPDF(story.id);
-                            }}
-                            title="Download PDF"
-                            className="h-8 w-8 p-0 hover:bg-primary/10"
-                          >
-                            <Download className="h-3 w-3" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePrintStory(story.id, story.title);
-                            }}
-                            title="Print story"
-                            className="h-8 w-8 p-0 hover:bg-primary/10"
-                          >
-                            <Printer className="h-3 w-3" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleShare(story.id, story.title);
-                            }}
-                            title="Share story"
-                            className="h-8 w-8 p-0 hover:bg-primary/10"
-                          >
-                            <Share className="h-3 w-3" />
-                          </Button>
-                        </>
-                      )}
-                      <Button 
-                        size="sm" 
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(story.id, story.title);
-                        }}
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        title="Delete story"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                )}
+              </div>
+
+              {/* Story Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {paginatedStories.map((story) => (
+                  <StoryCard key={story.id} story={story} onLike={handleLike} />
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex justify-center mt-8">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-2" />
+                      Previous
+                    </Button>
+                    
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let page;
+                      if (totalPages <= 5) {
+                        page = i + 1;
+                      } else if (currentPage <= 3) {
+                        page = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        page = totalPages - 4 + i;
+                      } else {
+                        page = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Last
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </section>
 
