@@ -56,7 +56,7 @@ const Library = () => {
               .select('image_url')
               .eq('story_id', story.id)
               .eq('page_number', 1)
-              .single();
+              .maybeSingle();
             
             return {
               ...story,
