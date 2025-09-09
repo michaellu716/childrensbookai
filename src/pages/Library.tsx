@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Loader2, AlertCircle, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useReactToPrint } from 'react-to-print';
 
 interface Story {
   id: string;
@@ -28,6 +29,8 @@ const Library = () => {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [stories, setStories] = useState<Story[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [storyContent, setStoryContent] = useState<any>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchStories();
@@ -92,6 +95,34 @@ const Library = () => {
       totalCharacters: uniqueCharacters.size
     };
   }, [stories, searchQuery, selectedFilter]);
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+  });
+
+  const handlePrintStory = async (storyId: string, storyTitle: string) => {
+    try {
+      toast.info('Loading story content for printing...');
+      
+      // Fetch the story details including pages and illustrations
+      const { data, error } = await supabase.functions.invoke('get-story-details', {
+        body: { storyId }
+      });
+
+      if (error) throw error;
+      
+      if (data?.story) {
+        setStoryContent(data.story);
+        // Small delay to ensure content is rendered
+        setTimeout(() => {
+          handlePrint();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error preparing story for print:', error);
+      toast.error('Failed to prepare story for printing');
+    }
+  };
 
   const handleDuplicate = async (storyId: string) => {
     try {
@@ -363,26 +394,34 @@ const Library = () => {
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
-                      {story.status === "completed" && (
-                        <>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleDownloadPDF(story.id)}
-                            title="Download PDF"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleShare(story.id, story.title)}
-                            title="Share story"
-                          >
-                            <Share className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
+                       {story.status === "completed" && (
+                         <>
+                           <Button 
+                             size="sm" 
+                             variant="outline"
+                             onClick={() => handleDownloadPDF(story.id)}
+                             title="Download PDF"
+                           >
+                             <Download className="h-4 w-4" />
+                           </Button>
+                           <Button 
+                             size="sm" 
+                             variant="outline"
+                             onClick={() => handlePrintStory(story.id, story.title)}
+                             title="Print story"
+                           >
+                             <Printer className="h-4 w-4" />
+                           </Button>
+                           <Button 
+                             size="sm" 
+                             variant="outline"
+                             onClick={() => handleShare(story.id, story.title)}
+                             title="Share story"
+                           >
+                             <Share className="h-4 w-4" />
+                           </Button>
+                         </>
+                       )}
                       <Button 
                         size="sm" 
                         variant="outline"
@@ -419,6 +458,66 @@ const Library = () => {
             </div>
           </Card>
         )}
+      </div>
+
+      {/* Hidden print content */}
+      <div style={{ display: 'none' }}>
+        <div ref={printRef} className="print-content">
+          {storyContent && (
+            <div className="max-w-4xl mx-auto p-8 bg-white text-black">
+              {/* Story Header */}
+              <div className="text-center mb-12 border-b-2 border-gray-300 pb-8">
+                <h1 className="text-4xl font-bold mb-4 text-gray-800">{storyContent.title}</h1>
+                <p className="text-xl text-gray-600 mb-2">
+                  A Story for {storyContent.child_name}
+                  {storyContent.child_age && `, Age ${storyContent.child_age}`}
+                </p>
+                <div className="flex justify-center gap-2 mt-4">
+                  {storyContent.themes?.map((theme: string) => (
+                    <span key={theme} className="px-3 py-1 bg-gray-200 rounded-full text-sm">
+                      {theme}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Story Pages */}
+              {storyContent.pages?.map((page: any, index: number) => (
+                <div key={index} className="mb-12 print:break-inside-avoid">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-800">
+                      Page {index + 1}
+                    </h2>
+                    {page.illustration_url && (
+                      <div className="text-center mb-6">
+                        <img 
+                          src={page.illustration_url} 
+                          alt={`Illustration for page ${index + 1}`}
+                          className="max-w-full h-auto max-h-96 mx-auto rounded-lg shadow-sm"
+                        />
+                      </div>
+                    )}
+                    <div className="prose prose-lg max-w-none">
+                      <p className="text-lg leading-relaxed text-gray-700 whitespace-pre-wrap">
+                        {page.content}
+                      </p>
+                    </div>
+                  </div>
+                  {index < storyContent.pages.length - 1 && (
+                    <div className="print:break-after-page border-t border-gray-300 mt-8"></div>
+                  )}
+                </div>
+              ))}
+
+              {/* Story Footer */}
+              <div className="text-center mt-12 pt-8 border-t-2 border-gray-300">
+                <p className="text-sm text-gray-500">
+                  Created with StoryBookAI • {new Date().toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
