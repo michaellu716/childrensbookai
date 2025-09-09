@@ -198,7 +198,7 @@ const Library = () => {
       const storyToUpdate = stories.find(s => s.id === storyId);
       if (!storyToUpdate) return;
 
-      const newLikes = storyToUpdate.likes + 1;
+      const newLikes = (storyToUpdate.likes ?? 0) + 1;
       
       // Optimistic update
       queryClient.setQueryData(['stories'], (oldData: Story[] | undefined) => 
@@ -227,9 +227,10 @@ const Library = () => {
       }
 
       toast.success("Story liked!");
-    } catch (error) {
-      console.error("Error liking story:", error);
-      toast.error("Failed to like story");
+    } catch (err) {
+      const message = (err as any)?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      console.error('Error liking story:', err);
+      toast.error(`Failed to like story: ${message}`);
     }
   };
 

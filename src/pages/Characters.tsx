@@ -70,7 +70,7 @@ const Characters = () => {
       const character = characters.find(c => c.id === characterId);
       if (!character) return;
 
-      const newLikes = character.likes + 1;
+      const newLikes = (character.likes ?? 0) + 1;
       
       // Optimistic update
       queryClient.setQueryData(['characters'], (oldData: Character[] | undefined) => 
@@ -99,9 +99,10 @@ const Characters = () => {
       }
 
       toast.success("Character liked! 💖");
-    } catch (error) {
-      console.error("Error liking character:", error);
-      toast.error("Failed to like character");
+    } catch (err) {
+      const message = (err as any)?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      console.error('Error liking character:', err);
+      toast.error(`Failed to like character: ${message}`);
     }
   };
 
@@ -182,7 +183,7 @@ const Characters = () => {
               </div>
               <div className="bg-gradient-card rounded-lg p-4 shadow-card">
                 <div className="text-2xl font-bold text-pink-500">
-                  {characters.reduce((sum, char) => sum + char.likes, 0)}
+                  {characters.reduce((sum, char) => sum + (char.likes || 0), 0)}
                 </div>
                 <div className="text-sm text-muted-foreground">Total Likes</div>
               </div>
