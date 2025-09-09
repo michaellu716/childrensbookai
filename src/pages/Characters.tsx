@@ -339,8 +339,8 @@ const Characters = () => {
                   </p>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
+                {/* Centered Action Button */}
+                <div className="flex justify-center">
                   <Button 
                     size="lg" 
                     onClick={() => navigate('/create')}
@@ -353,99 +353,10 @@ const Characters = () => {
                       <span>Create New Story</span>
                     </div>
                   </Button>
-                  
-                  <Button 
-                    size="lg" 
-                    variant="outline"
-                    onClick={() => navigate('/create')}
-                    className="group px-8 py-6 text-lg font-semibold border-2 border-primary/30 hover:border-primary hover:bg-primary/5 transition-all duration-300 transform hover:scale-105"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                        <Users className="w-5 h-5 text-primary" />
-                      </div>
-                      <span>Use Existing Character</span>
-                    </div>
-                  </Button>
-                </div>
-
-                {/* Feature Highlights */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                  <div className="flex flex-col items-center p-6 rounded-xl bg-gradient-card border border-primary/10 shadow-card hover:shadow-glow/20 transition-all">
-                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                      <span className="text-2xl">🤖</span>
-                    </div>
-                    <h3 className="font-bold text-lg mb-2 text-gradient">AI-Powered</h3>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Let AI craft personalized stories with your favorite characters
-                    </p>
-                  </div>
-                  
-                  <div className="flex flex-col items-center p-6 rounded-xl bg-gradient-card border border-primary/10 shadow-card hover:shadow-glow/20 transition-all">
-                    <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center mb-4">
-                      <span className="text-2xl">🎨</span>
-                    </div>
-                    <h3 className="font-bold text-lg mb-2 text-gradient">Beautiful Illustrations</h3>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Every story comes with stunning, custom artwork
-                    </p>
-                  </div>
-                  
-                  <div className="flex flex-col items-center p-6 rounded-xl bg-gradient-card border border-primary/10 shadow-card hover:shadow-glow/20 transition-all">
-                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                      <span className="text-2xl">📚</span>
-                    </div>
-                    <h3 className="font-bold text-lg mb-2 text-gradient">Interactive Reading</h3>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Engaging stories with voice narration and animations
-                    </p>
-                  </div>
                 </div>
               </div>
             </Card>
 
-            {/* Quick Actions Row */}
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Random Character Story */}
-              <Card className="group overflow-hidden bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-0 shadow-card hover:shadow-glow/20 transition-all duration-300 cursor-pointer" onClick={() => navigate('/create')}>
-                <div className="p-6 flex items-center gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
-                      <span className="text-2xl">🎲</span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-2 text-gradient group-hover:scale-105 transition-transform">
-                      Surprise Me!
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Generate a random story with one of your characters
-                    </p>
-                  </div>
-                  <ChevronRight className="w-6 h-6 text-primary group-hover:translate-x-1 transition-transform" />
-                </div>
-              </Card>
-
-              {/* Character Adventure */}
-              <Card className="group overflow-hidden bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-0 shadow-card hover:shadow-glow/20 transition-all duration-300 cursor-pointer" onClick={() => navigate('/create')}>
-                <div className="p-6 flex items-center gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
-                      <span className="text-2xl">🚀</span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-2 text-gradient group-hover:scale-105 transition-transform">
-                      Epic Adventure
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Create an exciting adventure story for your character
-                    </p>
-                  </div>
-                  <ChevronRight className="w-6 h-6 text-primary group-hover:translate-x-1 transition-transform" />
-                </div>
-              </Card>
-            </div>
 
             {/* Stats and Encouragement */}
             {characters.length > 0 && (
