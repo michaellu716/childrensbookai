@@ -375,18 +375,22 @@ const Library = () => {
               </Card>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
               {filteredStories.map((story) => (
                 <div key={story.id} className="group relative">
                   {/* Book Cover */}
-                  <div className="relative bg-gradient-to-br from-primary/10 via-background to-accent/10 rounded-lg overflow-hidden shadow-card hover:shadow-glow/30 transition-all duration-500 transform hover:-translate-y-2 cursor-pointer border border-border/20"
-                       onClick={() => navigate(`/review?storyId=${story.id}`)}>
+                  <div className="relative bg-gradient-to-br from-primary/10 via-background to-accent/10 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 transform hover:-translate-y-1 hover:rotate-1 cursor-pointer border border-border/20 perspective-1000"
+                       onClick={() => navigate(`/review?storyId=${story.id}`)}
+                       style={{
+                         transformStyle: 'preserve-3d',
+                         boxShadow: '0 8px 25px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1) inset'
+                       }}>
                     
                     {/* Book Spine Effect */}
-                    <div className="absolute left-0 top-0 w-2 h-full bg-gradient-to-b from-primary/60 to-primary/40 shadow-inner"></div>
+                    <div className="absolute left-0 top-0 w-1.5 h-full bg-gradient-to-b from-primary/70 to-primary/50 shadow-inner"></div>
                     
                     {/* Cover Image */}
-                    <div className="aspect-[3/4] relative overflow-hidden">
+                    <div className="aspect-[2/3] relative overflow-hidden">
                       {story.first_page_image ? (
                         <img 
                           src={story.first_page_image} 
@@ -400,16 +404,16 @@ const Library = () => {
                       ) : null}
                       
                       {/* Fallback Cover Design */}
-                      <div className={`absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-6 text-center ${story.first_page_image ? 'hidden' : ''}`}>
-                        <BookOpen className="h-12 w-12 text-primary/60 mb-4" />
-                        <h3 className="font-bold text-lg leading-tight text-primary/80 line-clamp-3">{story.title}</h3>
+                      <div className={`absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-4 text-center ${story.first_page_image ? 'hidden' : ''}`}>
+                        <BookOpen className="h-8 w-8 text-primary/60 mb-3" />
+                        <h3 className="font-bold text-sm leading-tight text-primary/80 line-clamp-2">{story.title}</h3>
                       </div>
                       
                       {/* Overlay */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       
                       {/* Status Badge */}
-                      <div className="absolute top-3 right-3 z-10">
+                      <div className="absolute top-2 right-2 z-10">
                         {getStatusBadge(story.status)}
                       </div>
                       
@@ -421,24 +425,26 @@ const Library = () => {
                           e.stopPropagation();
                           handleLike(story.id);
                         }}
-                        className="absolute top-3 left-3 z-10 text-white hover:text-yellow-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20"
+                        className="absolute top-2 left-2 z-10 text-white hover:text-yellow-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 h-7 w-7 p-0"
                       >
-                        <Star className="h-4 w-4 fill-current" />
-                        <span className="ml-1 text-xs">{story.likes || 0}</span>
+                        <Star className="h-3 w-3 fill-current" />
+                        <span className="ml-1 text-xs hidden group-hover:inline">{story.likes || 0}</span>
                       </Button>
                     </div>
                     
                     {/* Book Info Overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                      <h3 className="font-bold text-sm line-clamp-2 mb-1">{story.title}</h3>
-                      <p className="text-xs opacity-80 line-clamp-1">For {story.child_name}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs px-2 py-0.5 bg-white/20 rounded-full">{story.length}p</span>
-                        {story.themes?.slice(0, 2).map((theme) => (
-                          <span key={theme} className="text-xs px-2 py-0.5 bg-white/20 rounded-full">
-                            {theme}
-                          </span>
-                        ))}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-white transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
+                      <h3 className="font-bold text-xs line-clamp-2 mb-1">{story.title}</h3>
+                      <p className="text-xs opacity-80 line-clamp-1 mb-1">For {story.child_name}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs px-1.5 py-0.5 bg-white/20 rounded-full">{story.length}p</span>
+                        <div className="flex gap-1">
+                          {story.themes?.slice(0, 1).map((theme) => (
+                            <span key={theme} className="text-xs px-1.5 py-0.5 bg-white/20 rounded-full truncate max-w-16">
+                              {theme}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
