@@ -264,30 +264,37 @@ const Library = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading your stories...</p>
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto">
+          <div className="w-20 h-20 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+            <Loader2 className="h-10 w-10 animate-spin text-primary-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2 text-gradient">Loading your stories...</h3>
+          <p className="text-muted-foreground">Getting everything ready for you</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       {/* Header */}
-      <header className="border-b border-border bg-background/95 backdrop-blur">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => navigate('/')}>
-                <BookOpen className="mr-2 h-4 w-4" />
-                StoryBookAI
+              <Button variant="ghost" onClick={() => navigate('/')} className="p-2 hover:bg-primary/10">
+                <div className="flex items-center space-x-3">
+                  <div className="p-1 rounded-lg bg-gradient-primary">
+                    <BookOpen className="h-5 w-5 text-primary-foreground" />
+                  </div>
+                  <span className="text-xl font-bold text-gradient">StoryBookAI</span>
+                </div>
               </Button>
-              <div className="hidden sm:block h-6 w-px bg-border"></div>
-              <h1 className="text-xl font-semibold">My Library</h1>
+              <div className="hidden sm:block h-6 w-px bg-border/50"></div>
+              <h1 className="text-2xl font-bold text-gradient">My Library</h1>
             </div>
-            <Button variant="hero" onClick={() => navigate('/create')}>
+            <Button onClick={() => navigate('/create')} className="shadow-glow hover:shadow-glow/80 transition-all">
               <Plus className="mr-2 h-4 w-4" />
               Create New Story
             </Button>
@@ -295,194 +302,214 @@ const Library = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="container mx-auto px-6 py-12">
         {/* Search and Filters */}
-        <div className="mb-8 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search stories, characters, or themes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+        <section className="mb-12">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold mb-2 text-gradient">Your Story Collection</h2>
+              <p className="text-muted-foreground text-lg">Manage and organize your magical stories</p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant={selectedFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFilter("all")}
-              >
-                All ({stories.length})
-              </Button>
-              <Button
-                variant={selectedFilter === "completed" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFilter("completed")}
-              >
-                Completed ({statusCounts.completed})
-              </Button>
-              <Button
-                variant={selectedFilter === "generating" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFilter("generating")}
-              >
-                Generating ({statusCounts.generating})
-              </Button>
-              <Button
-                variant={selectedFilter === "draft" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFilter("draft")}
-              >
-                Drafts ({statusCounts.draft})
-              </Button>
+            
+            <div className="flex flex-col lg:flex-row gap-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  placeholder="Search stories, characters, or themes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-12 h-12 text-lg bg-gradient-card border-0 shadow-card focus:shadow-glow/20 transition-all"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedFilter === "all" ? "default" : "outline"}
+                  onClick={() => setSelectedFilter("all")}
+                  className="shadow-card hover:shadow-glow/20 transition-all"
+                >
+                  All ({stories.length})
+                </Button>
+                <Button
+                  variant={selectedFilter === "completed" ? "default" : "outline"}
+                  onClick={() => setSelectedFilter("completed")}
+                  className="shadow-card hover:shadow-glow/20 transition-all"
+                >
+                  Completed ({statusCounts.completed})
+                </Button>
+                <Button
+                  variant={selectedFilter === "generating" ? "default" : "outline"}
+                  onClick={() => setSelectedFilter("generating")}
+                  className="shadow-card hover:shadow-glow/20 transition-all"
+                >
+                  Generating ({statusCounts.generating})
+                </Button>
+                <Button
+                  variant={selectedFilter === "draft" ? "default" : "outline"}
+                  onClick={() => setSelectedFilter("draft")}
+                  className="shadow-card hover:shadow-glow/20 transition-all"
+                >
+                  Drafts ({statusCounts.draft})
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Stories Grid */}
-        {filteredStories.length === 0 ? (
-          <Card className="p-12 text-center bg-gradient-card">
-            <BookOpen className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">
-              {searchQuery || selectedFilter !== "all" ? "No stories found" : "No stories yet"}
-            </h3>
-            <p className="text-muted-foreground mb-6">
-              {searchQuery || selectedFilter !== "all"
-                ? "Try adjusting your search terms or filters"
-                : "Create your first magical bedtime story!"
-              }
-            </p>
-            <Button variant="hero" onClick={() => navigate('/create')}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Your First Story
-            </Button>
-          </Card>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredStories.map((story) => (
-              <Card key={story.id} className="overflow-hidden hover:shadow-card transition-all duration-300 bg-gradient-card group">
-                {/* Header */}
-                <div className="relative p-6 border-b bg-gradient-to-r from-primary/5 to-secondary/5">
-                  <div className="absolute top-3 right-3">
-                    {getStatusBadge(story.status)}
-                  </div>
-                  <div className="pr-20">
-                    <h3 className="font-semibold text-lg line-clamp-2 mb-1">{story.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      For {story.child_name}, {story.child_age ? `age ${story.child_age}` : ''}
-                    </p>
-                    <div className="text-xs text-muted-foreground mt-2">
-                      {story.length} pages • {story.art_style}
-                    </div>
-                  </div>
+        <section className="mb-16">
+          {filteredStories.length === 0 ? (
+            <div className="max-w-2xl mx-auto">
+              <Card className="p-16 text-center bg-gradient-card border-0 shadow-card">
+                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <BookOpen className="h-10 w-10 text-primary" />
                 </div>
-
-                {/* Content */}
-                <div className="p-6">
-                  <div className="space-y-3">
-                    {/* Themes */}
-                    {story.themes && story.themes.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {story.themes.slice(0, 3).map((theme) => (
-                          <Badge key={theme} variant="outline" className="text-xs">
-                            {theme}
-                          </Badge>
-                        ))}
-                        {story.themes.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{story.themes.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="text-xs text-muted-foreground">
-                      Created {formatDate(story.created_at)}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-1 pt-2">
-                      <Button 
-                        size="sm" 
-                        variant="default"
-                        onClick={() => navigate(`/review?storyId=${story.id}`)}
-                        className="flex-1"
-                      >
-                        {story.status === "completed" ? "View" : story.status === "generating" ? "Check Progress" : "Continue"}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleDuplicate(story.id)}
-                        title="Duplicate story"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                       {story.status === "completed" && (
-                         <>
-                           <Button 
-                             size="sm" 
-                             variant="outline"
-                             onClick={() => handleDownloadPDF(story.id)}
-                             title="Download PDF"
-                           >
-                             <Download className="h-4 w-4" />
-                           </Button>
-                           <Button 
-                             size="sm" 
-                             variant="outline"
-                             onClick={() => handlePrintStory(story.id, story.title)}
-                             title="Print story"
-                           >
-                             <Printer className="h-4 w-4" />
-                           </Button>
-                           <Button 
-                             size="sm" 
-                             variant="outline"
-                             onClick={() => handleShare(story.id, story.title)}
-                             title="Share story"
-                           >
-                             <Share className="h-4 w-4" />
-                           </Button>
-                         </>
-                       )}
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleDelete(story.id, story.title)}
-                        className="text-destructive hover:text-destructive"
-                        title="Delete story"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <h3 className="text-2xl font-bold mb-4 text-gradient">
+                  {searchQuery || selectedFilter !== "all" ? "No stories found" : "No stories yet"}
+                </h3>
+                <p className="text-muted-foreground text-lg mb-8">
+                  {searchQuery || selectedFilter !== "all"
+                    ? "Try adjusting your search terms or filters"
+                    : "Create your first magical bedtime story!"
+                  }
+                </p>
+                <Button onClick={() => navigate('/create')} size="lg" className="shadow-glow hover:shadow-glow/80 transition-all">
+                  <Plus className="mr-2 h-5 w-5" />
+                  Create Your First Story
+                </Button>
               </Card>
-            ))}
-          </div>
-        )}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-8">
+              {filteredStories.map((story) => (
+                <Card key={story.id} className="group overflow-hidden border-0 shadow-card hover:shadow-glow/20 transition-all duration-300 bg-gradient-card">
+                  {/* Header */}
+                  <div className="relative p-6 border-b border-border/30 bg-gradient-to-r from-primary/5 to-accent/5">
+                    <div className="absolute top-4 right-4">
+                      {getStatusBadge(story.status)}
+                    </div>
+                    <div className="pr-24">
+                      <h3 className="font-bold text-xl line-clamp-2 mb-2 group-hover:text-primary transition-colors">{story.title}</h3>
+                      <p className="text-muted-foreground font-medium">
+                        For {story.child_name}{story.child_age && `, age ${story.child_age}`}
+                      </p>
+                      <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+                        <span className="px-2 py-1 bg-primary/10 rounded-full">{story.length} pages</span>
+                        <span className="px-2 py-1 bg-accent/10 rounded-full">{story.art_style}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6">
+                    <div className="space-y-4">
+                      {/* Themes */}
+                      {story.themes && story.themes.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {story.themes.slice(0, 3).map((theme) => (
+                            <Badge key={theme} variant="outline" className="text-xs font-medium">
+                              {theme}
+                            </Badge>
+                          ))}
+                          {story.themes.length > 3 && (
+                            <Badge variant="outline" className="text-xs font-medium">
+                              +{story.themes.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="text-sm text-muted-foreground">
+                        Created {formatDate(story.created_at)}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2">
+                        <Button 
+                          variant="default"
+                          onClick={() => navigate(`/review?storyId=${story.id}`)}
+                          className="flex-1 group-hover:shadow-lg transition-all"
+                        >
+                          {story.status === "completed" ? "View" : story.status === "generating" ? "Check Progress" : "Continue"}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleDuplicate(story.id)}
+                          title="Duplicate story"
+                          className="group-hover:shadow-lg transition-all"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        {story.status === "completed" && (
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleDownloadPDF(story.id)}
+                              title="Download PDF"
+                              className="group-hover:shadow-lg transition-all"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handlePrintStory(story.id, story.title)}
+                              title="Print story"
+                              className="group-hover:shadow-lg transition-all"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleShare(story.id, story.title)}
+                              title="Share story"
+                              className="group-hover:shadow-lg transition-all"
+                            >
+                              <Share className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleDelete(story.id, story.title)}
+                          className="text-destructive hover:text-destructive group-hover:shadow-lg transition-all"
+                          title="Delete story"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Stats */}
         {filteredStories.length > 0 && (
-          <Card className="mt-8 p-6 bg-gradient-accent text-center">
-            <div className="grid grid-cols-3 gap-4 text-accent-foreground">
-              <div>
-                <div className="text-2xl font-bold">{stories.length}</div>
-                <div className="text-sm opacity-90">Total Stories</div>
+          <section className="max-w-4xl mx-auto">
+            <Card className="p-8 bg-gradient-primary border-0 shadow-glow text-center text-primary-foreground">
+              <h3 className="text-2xl font-bold mb-6">Your Story Statistics</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold">{stories.length}</div>
+                  <div className="text-lg opacity-90">Total Stories</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold">{statusCounts.completed}</div>
+                  <div className="text-lg opacity-90">Completed</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold">{totalCharacters}</div>
+                  <div className="text-lg opacity-90">Characters</div>
+                </div>
               </div>
-              <div>
-                <div className="text-2xl font-bold">{statusCounts.completed}</div>
-                <div className="text-sm opacity-90">Completed</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{totalCharacters}</div>
-                <div className="text-sm opacity-90">Characters</div>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          </section>
         )}
       </div>
 
