@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,8 +30,8 @@ const Library = () => {
     toast.error('Failed to load your stories');
   }
 
-  // Memoize expensive computations with pagination
-  const { filteredStories, paginatedStories, statusCounts, totalCharacters, totalPages } = useMemo(() => {
+  // Memoize expensive computations without side effects
+  const { filteredStories, statusCounts, totalCharacters } = useMemo(() => {
     const lowerSearchQuery = searchQuery.toLowerCase();
     
     // Calculate status counts once
@@ -65,25 +65,30 @@ const Library = () => {
       
       return matchesSearch && matchesFilter;
     });
-
-    // Reset to page 1 when filters change
-    if (currentPage > Math.ceil(filtered.length / STORIES_PER_PAGE)) {
-      setCurrentPage(1);
-    }
-
-    // Paginate results
-    const startIndex = (currentPage - 1) * STORIES_PER_PAGE;
-    const endIndex = startIndex + STORIES_PER_PAGE;
-    const paginated = filtered.slice(startIndex, endIndex);
     
     return {
       filteredStories: filtered,
-      paginatedStories: paginated,
       statusCounts: counts,
-      totalCharacters: uniqueCharacters.size,
-      totalPages: Math.ceil(filtered.length / STORIES_PER_PAGE)
+      totalCharacters: uniqueCharacters.size
     };
-  }, [stories, searchQuery, selectedFilter, currentPage]);
+  }, [stories, searchQuery, selectedFilter]);
+
+  // Calculate pagination separately to avoid infinite loops
+  const totalPages = Math.ceil(filteredStories.length / STORIES_PER_PAGE);
+  
+  // Reset to page 1 when filters change (in useEffect to avoid infinite renders)
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [filteredStories.length, currentPage, totalPages]);
+
+  // Calculate paginated results
+  const paginatedStories = useMemo(() => {
+    const startIndex = (currentPage - 1) * STORIES_PER_PAGE;
+    const endIndex = startIndex + STORIES_PER_PAGE;
+    return filteredStories.slice(startIndex, endIndex);
+  }, [filteredStories, currentPage]);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
