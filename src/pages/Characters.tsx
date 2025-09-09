@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
-import { Search, Users, ArrowLeft, Sparkles, Loader2, ChevronLeft, ChevronRight, Library } from "lucide-react";
+import { Search, Users, ArrowLeft, Sparkles, Loader2, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useCharactersQuery, type Character } from "@/hooks/useCharactersQuery";
@@ -141,7 +141,7 @@ const Characters = () => {
             </div>
             <div className="flex items-center gap-3">
               <Button variant="ghost" onClick={() => navigate('/library')} className="shadow-card hover:shadow-glow/20 transition-all">
-                <Library className="mr-2 h-4 w-4" />
+                <BookOpen className="mr-2 h-4 w-4" />
                 My Library
               </Button>
               <Button onClick={() => navigate('/create')} className="shadow-glow hover:shadow-glow/80 transition-all">
