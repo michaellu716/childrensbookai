@@ -552,18 +552,6 @@ const CreateStory = () => {
                   </p>
                 </div>
               )}
-              
-              {!formData.photo && (
-                <div className="mt-6 text-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentStep(currentStep + 1)}
-                    className="w-full"
-                  >
-                    Continue Without Photo
-                  </Button>
-                </div>
-              )}
             </Card>
           )}
 
