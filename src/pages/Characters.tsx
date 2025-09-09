@@ -259,14 +259,14 @@ const Characters = () => {
               </Card>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-6">
               {filteredCharacters.map((character) => (
                 <Card 
                   key={character.id} 
                   className="group overflow-hidden bg-gradient-card border-0 shadow-card hover:shadow-glow/30 transition-all duration-500 transform hover:-translate-y-2"
                 >
                   {/* Character Image */}
-                  <div className="aspect-square relative overflow-hidden bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5">
+                  <div className="aspect-[4/5] relative overflow-hidden bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5">
                     {character.cartoon_reference_url ? (
                       <img
                         src={character.cartoon_reference_url}
@@ -280,9 +280,9 @@ const Characters = () => {
                     ) : null}
                     
                     {/* Fallback Character Display */}
-                    <div className={`absolute inset-0 flex flex-col items-center justify-center p-6 text-center ${character.cartoon_reference_url ? 'hidden' : ''}`}>
-                      <div className="text-6xl mb-4">🎭</div>
-                      <h3 className="font-bold text-lg text-primary/80">{character.name}</h3>
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center p-3 text-center ${character.cartoon_reference_url ? 'hidden' : ''}`}>
+                      <div className="text-3xl mb-2">🎭</div>
+                      <h3 className="font-bold text-sm text-primary/80 line-clamp-2">{character.name}</h3>
                     </div>
                     
                     {/* Like Button */}
@@ -290,58 +290,52 @@ const Characters = () => {
                       size="sm" 
                       variant="ghost"
                       onClick={() => handleLike(character.id)}
-                      className={`absolute top-3 right-3 z-10 text-white hover:text-pink-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 transition-all ${
+                      className={`absolute top-2 right-2 z-10 text-white hover:text-pink-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 transition-all h-6 w-6 p-0 ${
                         likedCharacters.has(character.id) ? 'animate-bounce scale-110' : ''
                       }`}
                     >
-                      <Heart className={`h-4 w-4 ${character.likes > 0 ? 'fill-pink-400 text-pink-400' : ''}`} />
-                      <span className="ml-1 text-xs font-semibold">{character.likes || 0}</span>
+                      <Heart className={`h-3 w-3 ${character.likes > 0 ? 'fill-pink-400 text-pink-400' : ''}`} />
+                      <span className="ml-1 text-xs font-semibold hidden group-hover:inline">{character.likes || 0}</span>
                     </Button>
 
                     {/* Story Count Badge */}
                     {(character.story_count || 0) > 0 && (
-                      <Badge className="absolute top-3 left-3 bg-primary/80 text-primary-foreground">
-                        <BookOpen className="h-3 w-3 mr-1" />
-                        {character.story_count} stories
+                      <Badge className="absolute top-2 left-2 bg-primary/80 text-primary-foreground text-xs px-1 py-0">
+                        <BookOpen className="h-2 w-2 mr-1" />
+                        {character.story_count}
                       </Badge>
                     )}
                   </div>
 
                   {/* Character Info */}
-                  <div className="p-6">
-                    <div className="mb-4">
-                      <h3 className="text-xl font-bold mb-2 text-foreground">{character.name}</h3>
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {getCharacterTraits(character).map((trait, index) => (
+                  <div className="p-4">
+                    <div className="mb-3">
+                      <h3 className="text-sm font-bold mb-2 text-foreground line-clamp-1">{character.name}</h3>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {getCharacterTraits(character).slice(0, 2).map((trait, index) => (
                           <Badge 
                             key={index} 
                             variant="secondary" 
-                            className="text-xs bg-primary/10 text-primary border-primary/20"
+                            className="text-xs bg-primary/10 text-primary border-primary/20 px-1 py-0"
                           >
-                            {trait}
+                            {trait.length > 8 ? trait.substring(0, 8) + '...' : trait}
                           </Badge>
                         ))}
                       </div>
                       
                       {character.typical_outfit && (
-                        <p className="text-sm text-muted-foreground mb-2">
+                        <p className="text-xs text-muted-foreground mb-1 line-clamp-1">
                           👔 {character.typical_outfit}
-                        </p>
-                      )}
-                      
-                      {character.accessory && (
-                        <p className="text-sm text-muted-foreground mb-2">
-                          ✨ {character.accessory}
                         </p>
                       )}
                     </div>
 
                     <div className="flex justify-between items-center text-xs text-muted-foreground">
-                      <span>Created {formatDate(character.created_at)}</span>
                       <div className="flex items-center gap-1">
-                        <Heart className="h-3 w-3 fill-pink-400 text-pink-400" />
+                        <Heart className="h-2 w-2 fill-pink-400 text-pink-400" />
                         <span>{character.likes}</span>
                       </div>
+                      <span className="text-xs">{formatDate(character.created_at).split(',')[0]}</span>
                     </div>
                   </div>
                 </Card>
