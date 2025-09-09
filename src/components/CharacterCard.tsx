@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Star, Trash2, User } from "lucide-react";
+import { Star, User } from "lucide-react";
 import { LazyImage } from "./LazyImage";
 
 interface Character {
@@ -23,11 +23,10 @@ interface Character {
 interface CharacterCardProps {
   character: Character;
   onLike: (characterId: string) => void;
-  onDelete: (characterId: string, characterName: string) => void;
   onClick: (character: Character) => void;
 }
 
-export const CharacterCard = ({ character, onLike, onDelete, onClick }: CharacterCardProps) => {
+export const CharacterCard = ({ character, onLike, onClick }: CharacterCardProps) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -67,19 +66,6 @@ export const CharacterCard = ({ character, onLike, onDelete, onClick }: Characte
           >
             <Star className="h-4 w-4 fill-current" />
             <span className="ml-1 text-xs hidden group-hover:inline">{character.likes || 0}</span>
-          </Button>
-
-          {/* Delete Button */}
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(character.id, character.name);
-            }}
-            className="absolute top-2 left-2 z-10 text-white hover:text-red-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 h-8 w-8 p-0"
-          >
-            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
 

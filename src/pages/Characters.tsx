@@ -95,28 +95,6 @@ const Characters = () => {
     }
   };
 
-  const handleDelete = async (characterId: string, characterName: string) => {
-    if (!confirm(`Are you sure you want to delete "${characterName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('character_sheets')
-        .delete()
-        .eq('id', characterId);
-
-      if (error) throw error;
-      
-      toast.success('Character deleted successfully!');
-      // Invalidate and refetch characters
-      queryClient.invalidateQueries({ queryKey: ['characters'] });
-    } catch (error) {
-      console.error('Error deleting character:', error);
-      toast.error('Failed to delete character');
-    }
-  };
-
   const handleCharacterClick = (character: Character) => {
     // Navigate to create story with this character pre-selected
     navigate('/create', { state: { selectedCharacter: character } });
@@ -269,7 +247,6 @@ const Characters = () => {
                     key={character.id}
                     character={character}
                     onLike={handleLike}
-                    onDelete={handleDelete}
                     onClick={handleCharacterClick}
                   />
                 ))}
