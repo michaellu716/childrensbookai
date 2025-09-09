@@ -23,10 +23,9 @@ interface Character {
 interface CharacterCardProps {
   character: Character;
   onLike: (characterId: string) => void;
-  onClick: (character: Character) => void;
 }
 
-export const CharacterCard = ({ character, onLike, onClick }: CharacterCardProps) => {
+export const CharacterCard = ({ character, onLike }: CharacterCardProps) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -36,10 +35,9 @@ export const CharacterCard = ({ character, onLike, onClick }: CharacterCardProps
   };
 
   return (
-    <Card className="group relative overflow-hidden bg-gradient-card border-0 shadow-card hover:shadow-glow/20 transition-all duration-300 cursor-pointer">
-      <div onClick={() => onClick(character)}>
-        {/* Character Image */}
-        <div className="aspect-square relative overflow-hidden">
+    <Card className="group relative overflow-hidden bg-gradient-card border-0 shadow-card hover:shadow-glow/20 transition-all duration-300">
+      {/* Character Image */}
+      <div className="aspect-square relative overflow-hidden">
           <LazyImage
             src={character.cartoon_reference_url || character.photo_url}
             alt={`${character.name} character`}
@@ -100,7 +98,6 @@ export const CharacterCard = ({ character, onLike, onClick }: CharacterCardProps
             Created {formatDate(character.created_at)}
           </p>
         </div>
-      </div>
-    </Card>
-  );
-};
+      </Card>
+    );
+  };
