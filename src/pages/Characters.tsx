@@ -40,6 +40,23 @@ interface Character {
   story_count?: number;
 }
 
+const imageMap: Record<string, string> = {
+  'cat-1': catImage,
+  'dog-1': dogImage,
+  'rabbit-1': rabbitImage,
+  'bear-1': bearImage,
+  'elephant-1': elephantImage,
+  'lion-1': lionImage,
+  'fox-1': foxImage,
+  'panda-1': pandaImage,
+};
+
+const getCharacterImage = (url?: string): string | undefined => {
+  if (!url) return undefined;
+  if (url.startsWith('data:image')) return url;
+  return imageMap[url] || url;
+};
+
 const Characters = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
