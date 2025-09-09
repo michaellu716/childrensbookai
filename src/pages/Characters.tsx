@@ -259,14 +259,14 @@ const Characters = () => {
               </Card>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-6">
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4">
               {filteredCharacters.map((character) => (
                 <Card 
                   key={character.id} 
-                  className="group overflow-hidden bg-gradient-card border-0 shadow-card hover:shadow-glow/30 transition-all duration-500 transform hover:-translate-y-2"
+                  className="group overflow-hidden bg-gradient-card border-0 shadow-card hover:shadow-glow/30 transition-all duration-500 transform hover:-translate-y-1"
                 >
                   {/* Character Image */}
-                  <div className="aspect-[4/5] relative overflow-hidden bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5">
+                  <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5">
                     {character.cartoon_reference_url ? (
                       <img
                         src={character.cartoon_reference_url}
@@ -280,9 +280,9 @@ const Characters = () => {
                     ) : null}
                     
                     {/* Fallback Character Display */}
-                    <div className={`absolute inset-0 flex flex-col items-center justify-center p-3 text-center ${character.cartoon_reference_url ? 'hidden' : ''}`}>
-                      <div className="text-3xl mb-2">🎭</div>
-                      <h3 className="font-bold text-sm text-primary/80 line-clamp-2">{character.name}</h3>
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center p-2 text-center ${character.cartoon_reference_url ? 'hidden' : ''}`}>
+                      <div className="text-2xl mb-1">🎭</div>
+                      <h3 className="font-bold text-xs text-primary/80 line-clamp-2">{character.name}</h3>
                     </div>
                     
                     {/* Like Button */}
@@ -290,52 +290,43 @@ const Characters = () => {
                       size="sm" 
                       variant="ghost"
                       onClick={() => handleLike(character.id)}
-                      className={`absolute top-2 right-2 z-10 text-white hover:text-pink-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 transition-all h-6 w-6 p-0 ${
+                      className={`absolute top-1 right-1 z-10 text-white hover:text-pink-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 transition-all h-5 w-5 p-0 ${
                         likedCharacters.has(character.id) ? 'animate-bounce scale-110' : ''
                       }`}
                     >
-                      <Heart className={`h-3 w-3 ${character.likes > 0 ? 'fill-pink-400 text-pink-400' : ''}`} />
-                      <span className="ml-1 text-xs font-semibold hidden group-hover:inline">{character.likes || 0}</span>
+                      <Heart className={`h-2 w-2 ${character.likes > 0 ? 'fill-pink-400 text-pink-400' : ''}`} />
                     </Button>
 
                     {/* Story Count Badge */}
                     {(character.story_count || 0) > 0 && (
-                      <Badge className="absolute top-2 left-2 bg-primary/80 text-primary-foreground text-xs px-1 py-0">
-                        <BookOpen className="h-2 w-2 mr-1" />
+                      <Badge className="absolute top-1 left-1 bg-primary/80 text-primary-foreground text-xs px-1 py-0">
                         {character.story_count}
                       </Badge>
                     )}
                   </div>
 
                   {/* Character Info */}
-                  <div className="p-4">
-                    <div className="mb-3">
-                      <h3 className="text-sm font-bold mb-2 text-foreground line-clamp-1">{character.name}</h3>
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {getCharacterTraits(character).slice(0, 2).map((trait, index) => (
+                  <div className="p-2">
+                    <div className="mb-2">
+                      <h3 className="text-xs font-bold mb-1 text-foreground line-clamp-1">{character.name}</h3>
+                      
+                      {getCharacterTraits(character).length > 0 && (
+                        <div className="mb-1">
                           <Badge 
-                            key={index} 
                             variant="secondary" 
                             className="text-xs bg-primary/10 text-primary border-primary/20 px-1 py-0"
                           >
-                            {trait.length > 8 ? trait.substring(0, 8) + '...' : trait}
+                            {getCharacterTraits(character)[0].length > 6 ? getCharacterTraits(character)[0].substring(0, 6) + '..' : getCharacterTraits(character)[0]}
                           </Badge>
-                        ))}
-                      </div>
-                      
-                      {character.typical_outfit && (
-                        <p className="text-xs text-muted-foreground mb-1 line-clamp-1">
-                          👔 {character.typical_outfit}
-                        </p>
+                        </div>
                       )}
                     </div>
 
                     <div className="flex justify-between items-center text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Heart className="h-2 w-2 fill-pink-400 text-pink-400" />
-                        <span>{character.likes}</span>
+                        <span className="text-xs">{character.likes}</span>
                       </div>
-                      <span className="text-xs">{formatDate(character.created_at).split(',')[0]}</span>
                     </div>
                   </div>
                 </Card>
