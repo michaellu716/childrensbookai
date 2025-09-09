@@ -51,20 +51,20 @@ export const AvatarStyleSelector: React.FC<AvatarStyleSelectorProps> = ({
   // Handle case when no avatar styles are available
   if (!avatarStyles || avatarStyles.length === 0) {
     return (
-      <Card className="p-8 text-center">
-        <h3 className="text-lg font-semibold mb-2">Choose Your Child's Cartoon Style</h3>
-        <p className="text-muted-foreground mb-4">
-          No avatar styles available. The image generation may have failed due to API limits.
+      <Card className="p-6 text-center max-w-2xl mx-auto">
+        <h3 className="text-lg font-semibold mb-3">Choose Your Child's Cartoon Style</h3>
+        <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
+          Unable to generate cartoon styles from the photo. This might be due to API limits or processing issues.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button variant="outline" onClick={onBack}>
-            Go Back to Create Character
+        <div className="flex flex-col gap-3 max-w-md mx-auto">
+          <Button variant="outline" onClick={onBack} className="w-full">
+            Upload Different Photo
           </Button>
-          <Button variant="secondary" onClick={onRetry}>
-            Try Generating Styles Again
+          <Button variant="secondary" onClick={onRetry} className="w-full">
+            Try Again
           </Button>
-          <Button onClick={onSkip}>
-            Skip Photo Feature
+          <Button onClick={onSkip} className="w-full">
+            Continue Without Photo
           </Button>
         </div>
       </Card>
