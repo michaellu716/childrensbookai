@@ -94,6 +94,7 @@ export type Database = {
           language: string | null
           length: number | null
           lesson: string | null
+          likes: number
           pdf_url: string | null
           prompt: string
           reading_level: string | null
@@ -115,6 +116,7 @@ export type Database = {
           language?: string | null
           length?: number | null
           lesson?: string | null
+          likes?: number
           pdf_url?: string | null
           prompt: string
           reading_level?: string | null
@@ -136,6 +138,7 @@ export type Database = {
           language?: string | null
           length?: number | null
           lesson?: string | null
+          likes?: number
           pdf_url?: string | null
           prompt?: string
           reading_level?: string | null

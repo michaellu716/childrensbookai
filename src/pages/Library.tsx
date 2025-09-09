@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Loader2, AlertCircle, Printer } from "lucide-react";
+import { BookOpen, Search, Plus, Download, Share, Copy, Trash2, Loader2, AlertCircle, Printer, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useReactToPrint } from 'react-to-print';
@@ -21,6 +21,7 @@ interface Story {
   status: string;
   updated_at: string;
   user_id: string;
+  likes: number;
 }
 
 const Library = () => {
@@ -40,7 +41,7 @@ const Library = () => {
     try {
       const { data, error } = await supabase
         .from('stories')
-        .select('id, title, child_name, child_age, themes, art_style, length, created_at, status, updated_at, user_id')
+        .select('id, title, child_name, child_age, themes, art_style, length, created_at, status, updated_at, user_id, likes')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -225,6 +226,33 @@ const Library = () => {
     toast.success(`Share link for "${storyTitle}" copied to clipboard!`);
   };
 
+  const handleLike = async (storyId: string) => {
+    try {
+      const storyToUpdate = stories.find(s => s.id === storyId);
+      if (!storyToUpdate) return;
+
+      const newLikes = storyToUpdate.likes + 1;
+      
+      const { error } = await supabase
+        .from('stories')
+        .update({ likes: newLikes })
+        .eq('id', storyId);
+
+      if (error) throw error;
+
+      setStories(stories.map(story => 
+        story.id === storyId 
+          ? { ...story, likes: newLikes }
+          : story
+      ));
+
+      toast.success("Story liked!");
+    } catch (error) {
+      console.error("Error liking story:", error);
+      toast.error("Failed to like story");
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
@@ -407,63 +435,76 @@ const Library = () => {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex gap-2 pt-2">
-                        <Button 
-                          variant="default"
-                          onClick={() => navigate(`/review?storyId=${story.id}`)}
-                          className="flex-1 group-hover:shadow-lg transition-all"
-                        >
-                          {story.status === "completed" ? "View" : story.status === "generating" ? "Check Progress" : "Continue"}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleDuplicate(story.id)}
-                          title="Duplicate story"
-                          className="group-hover:shadow-lg transition-all"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        {story.status === "completed" && (
-                          <>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleDownloadPDF(story.id)}
-                              title="Download PDF"
-                              className="group-hover:shadow-lg transition-all"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handlePrintStory(story.id, story.title)}
-                              title="Print story"
-                              className="group-hover:shadow-lg transition-all"
-                            >
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleShare(story.id, story.title)}
-                              title="Share story"
-                              className="group-hover:shadow-lg transition-all"
-                            >
-                              <Share className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleDelete(story.id, story.title)}
-                          className="text-destructive hover:text-destructive group-hover:shadow-lg transition-all"
-                          title="Delete story"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between">
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => handleLike(story.id)}
+                            className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 flex items-center gap-2"
+                          >
+                            <Star className="h-4 w-4 fill-current" />
+                            {story.likes || 0}
+                          </Button>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="default"
+                            onClick={() => navigate(`/review?storyId=${story.id}`)}
+                            className="flex-1 group-hover:shadow-lg transition-all"
+                          >
+                            {story.status === "completed" ? "View" : story.status === "generating" ? "Check Progress" : "Continue"}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleDuplicate(story.id)}
+                            title="Duplicate story"
+                            className="group-hover:shadow-lg transition-all"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          {story.status === "completed" && (
+                            <>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleDownloadPDF(story.id)}
+                                title="Download PDF"
+                                className="group-hover:shadow-lg transition-all"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handlePrintStory(story.id, story.title)}
+                                title="Print story"
+                                className="group-hover:shadow-lg transition-all"
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleShare(story.id, story.title)}
+                                title="Share story"
+                                className="group-hover:shadow-lg transition-all"
+                              >
+                                <Share className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleDelete(story.id, story.title)}
+                            className="text-destructive hover:text-destructive group-hover:shadow-lg transition-all"
+                            title="Delete story"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
