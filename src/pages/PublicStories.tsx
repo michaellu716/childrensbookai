@@ -1,32 +1,50 @@
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { useNavigate } from "react-router-dom";
-import { Search, BookOpen, Users, Star, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
-import { usePublicStoriesQuery, type PublicStory } from "@/hooks/usePublicStoriesQuery";
-import { LazyImage } from "@/components/LazyImage";
 import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+import { BookOpen, Search, Users, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import { usePublicStoriesQuery, type PublicStory } from "@/hooks/usePublicStoriesQuery";
+import { StoryCard } from "@/components/StoryCard";
 
-const STORIES_PER_PAGE = 12;
+const STORIES_PER_PAGE = 24;
 
 const PublicStories = () => {
   const navigate = useNavigate();
   const { data: stories = [], isLoading, error } = usePublicStoriesQuery();
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Filter stories based on search query
-  const filteredStories = useMemo(() => {
-    if (!searchQuery.trim()) return stories;
+  // Memoize filtered stories and statistics
+  const { filteredStories, totalCharacters } = useMemo(() => {
+    const lowerSearchQuery = searchQuery.toLowerCase();
     
-    const query = searchQuery.toLowerCase();
-    return stories.filter(story => 
-      story.title.toLowerCase().includes(query) ||
-      story.child_name?.toLowerCase().includes(query) ||
-      story.themes?.some(theme => theme.toLowerCase().includes(query))
-    );
-  }, [stories, searchQuery]);
+    const uniqueCharacters = new Set<string>();
+    
+    const filtered = stories.filter(story => {
+      // Add to character count
+      if (story.child_name) {
+        uniqueCharacters.add(story.child_name.toLowerCase());
+      }
+
+      // Apply search filter
+      const matchesSearch = !searchQuery || 
+        story.title.toLowerCase().includes(lowerSearchQuery) ||
+        story.child_name?.toLowerCase().includes(lowerSearchQuery) ||
+        story.themes?.some(theme => theme.toLowerCase().includes(lowerSearchQuery));
+
+      // Apply status filter (for public stories, we only show completed ones)
+      const matchesFilter = selectedFilter === 'all' || story.art_style === selectedFilter;
+
+      return matchesSearch && matchesFilter;
+    });
+
+    return {
+      filteredStories: filtered,
+      totalCharacters: uniqueCharacters.size
+    };
+  }, [stories, searchQuery, selectedFilter]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredStories.length / STORIES_PER_PAGE);
@@ -35,10 +53,16 @@ const PublicStories = () => {
     return filteredStories.slice(startIndex, startIndex + STORIES_PER_PAGE);
   }, [filteredStories, currentPage]);
 
-  // Reset to first page when search changes
+  // Reset to first page when filters change
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, selectedFilter]);
+
+  // Get unique art styles for filter
+  const artStyles = useMemo(() => {
+    const styles = new Set(stories.map(story => story.art_style).filter(Boolean));
+    return Array.from(styles).sort();
+  }, [stories]);
 
   if (isLoading) {
     return (
@@ -64,8 +88,8 @@ const PublicStories = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border bg-background/95 backdrop-blur">
+      {/* Navigation Header */}
+      <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             <div className="flex items-center gap-4">
@@ -74,14 +98,16 @@ const PublicStories = () => {
               </Button>
               <div className="flex items-center gap-2">
                 <BookOpen className="h-6 w-6 text-primary" />
-                <h1 className="text-xl font-bold">Public Story Gallery</h1>
+                <h1 className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">
+                  Public Story Gallery
+                </h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <Button variant="outline" onClick={() => navigate('/auth')}>
                 Sign In
               </Button>
-              <Button onClick={() => navigate('/create')}>
+              <Button onClick={() => navigate('/auth')} className="shadow-glow hover:shadow-glow/80 transition-all">
                 Create Story
               </Button>
             </div>
@@ -90,143 +116,160 @@ const PublicStories = () => {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search and Filter Section */}
-        <div className="mb-8 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-2">Discover Amazing Stories</h2>
+              <p className="text-muted-foreground">
+                Explore creative stories shared by our community
+              </p>
+            </div>
+            
+            {/* Statistics */}
+            <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-primary rounded-full"></div>
+                <span className="font-medium">{filteredStories.length}</span>
+                <span>Stories</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-accent rounded-full"></div>
+                <span className="font-medium">{totalCharacters}</span>
+                <span>Characters</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search stories by title, child name, or themes..."
+                placeholder="Search by title, character name, or themes..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
-          </div>
-
-          {/* Statistics */}
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <BookOpen className="h-4 w-4" />
-              <span>{filteredStories.length} stories</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              <span>{new Set(stories.map(s => s.child_name)).size} characters</span>
+            
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant={selectedFilter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedFilter("all")}
+              >
+                All Styles
+              </Button>
+              {artStyles.map((style) => (
+                <Button
+                  key={style}
+                  variant={selectedFilter === style ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedFilter(style)}
+                  className="capitalize"
+                >
+                  {style}
+                </Button>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Stories Grid */}
+        {/* Stories Content */}
         {paginatedStories.length === 0 ? (
-          <div className="text-center py-12">
-            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No stories found</h3>
-            <p className="text-muted-foreground">
-              {searchQuery ? "Try adjusting your search terms" : "No public stories available yet"}
-            </p>
+          <div className="text-center py-16">
+            <div className="max-w-md mx-auto">
+              <BookOpen className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                {searchQuery || selectedFilter !== "all" 
+                  ? "No stories match your search" 
+                  : "No public stories yet"
+                }
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                {searchQuery || selectedFilter !== "all"
+                  ? "Try adjusting your search terms or filters"
+                  : "Be the first to share a story with the community!"
+                }
+              </p>
+              <Button onClick={() => navigate('/auth')} className="shadow-glow hover:shadow-glow/80 transition-all">
+                Create Your Story
+              </Button>
+            </div>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+          <div className="space-y-8">
+            {/* Story Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
               {paginatedStories.map((story) => (
-                <PublicStoryCard key={story.id} story={story} />
+                <StoryCard 
+                  key={story.id} 
+                  story={story as any} 
+                  onLike={() => {}} 
+                  isPublicView={true}
+                />
               ))}
             </div>
 
-            {/* Pagination */}
+            {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                
-                <span className="text-sm text-muted-foreground px-4">
-                  Page {currentPage} of {totalPages}
-                </span>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+              <div className="flex justify-center mt-8">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else {
+                        const start = Math.max(1, currentPage - 2);
+                        const end = Math.min(totalPages, start + 4);
+                        pageNum = start + i;
+                        if (pageNum > end) return null;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
   );
 };
 
-interface PublicStoryCardProps {
-  story: PublicStory;
-}
-
-const PublicStoryCard = ({ story }: PublicStoryCardProps) => {
-  const navigate = useNavigate();
-
-  return (
-    <Card 
-      className="group cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-card bg-gradient-card border-border/50"
-      onClick={() => navigate(`/review?story=${story.id}`)}
-    >
-      <div className="relative aspect-[3/4] overflow-hidden">
-        <LazyImage
-          src={story.first_page_image || "/placeholder.svg"}
-          alt={`${story.title} cover`}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        <div className="absolute top-2 right-2">
-          <Badge variant="secondary" className="bg-background/80 text-foreground">
-            {story.art_style}
-          </Badge>
-        </div>
-        <div className="absolute bottom-2 left-2 right-2 text-white">
-          <h3 className="font-bold text-lg mb-1 line-clamp-2">{story.title}</h3>
-          <p className="text-sm opacity-90">For {story.child_name}</p>
-        </div>
-      </div>
-      
-      <div className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Star className="h-4 w-4" />
-            <span>{story.likes}</span>
-          </div>
-          <Badge variant="outline" className="text-xs">
-            {story.length} pages
-          </Badge>
-        </div>
-        
-        {story.themes && story.themes.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {story.themes.slice(0, 2).map((theme, index) => (
-              <Badge key={index} variant="secondary" className="text-xs">
-                {theme}
-              </Badge>
-            ))}
-            {story.themes.length > 2 && (
-              <Badge variant="secondary" className="text-xs">
-                +{story.themes.length - 2}
-              </Badge>
-            )}
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-};
 
 export default PublicStories;

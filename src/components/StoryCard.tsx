@@ -26,9 +26,10 @@ interface StoryCardProps {
   story: Story;
   onLike: (storyId: string) => void;
   onTogglePublic?: (storyId: string, isPublic: boolean) => void;
+  isPublicView?: boolean;
 }
 
-export const StoryCard = ({ story, onLike, onTogglePublic }: StoryCardProps) => {
+export const StoryCard = ({ story, onLike, onTogglePublic, isPublicView = false }: StoryCardProps) => {
   const navigate = useNavigate();
   
   // Use lazy loading for images if not already loaded
@@ -89,22 +90,29 @@ export const StoryCard = ({ story, onLike, onTogglePublic }: StoryCardProps) => 
             {getStatusBadge(story.status)}
           </div>
           
-          {/* Like Button */}
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              onLike(story.id);
-            }}
-            className="absolute top-2 left-2 z-10 text-white hover:text-yellow-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 h-7 w-7 p-0"
-          >
-            <Star className="h-3 w-3 fill-current" />
-            <span className="ml-1 text-xs hidden group-hover:inline">{story.likes || 0}</span>
-          </Button>
+          {/* Like Button - Show only if not in public view or make it read-only */}
+          {!isPublicView ? (
+            <Button 
+              size="sm" 
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                onLike(story.id);
+              }}
+              className="absolute top-2 left-2 z-10 text-white hover:text-yellow-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 h-7 w-7 p-0"
+            >
+              <Star className="h-3 w-3 fill-current" />
+              <span className="ml-1 text-xs hidden group-hover:inline">{story.likes || 0}</span>
+            </Button>
+          ) : (
+            <div className="absolute top-2 left-2 z-10 text-white backdrop-blur-sm bg-black/10 border border-white/20 h-7 px-2 rounded flex items-center text-xs">
+              <Star className="h-3 w-3 fill-current mr-1" />
+              {story.likes || 0}
+            </div>
+          )}
 
-          {/* Public/Private Toggle */}
-          {onTogglePublic && (
+          {/* Public/Private Toggle - Only show for authenticated users */}
+          {onTogglePublic && !isPublicView && (
             <Button 
               size="sm" 
               variant="ghost"
