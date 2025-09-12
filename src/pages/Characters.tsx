@@ -10,6 +10,7 @@ import { useCharactersQuery, type Character } from "@/hooks/useCharactersQuery";
 import { CharacterCard } from "@/components/CharacterCard";
 import { useQueryClient } from '@tanstack/react-query';
 import { Footer } from "@/components/Footer";
+import type { User } from '@supabase/supabase-js';
 
 const CHARACTERS_PER_PAGE = 24;
 
@@ -18,8 +19,22 @@ const Characters = () => {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [user, setUser] = useState<User | null>(null);
 
-  const { data: characters = [], isLoading, error } = useCharactersQuery();
+  // Get current user
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const { data: characters = [], isLoading, error } = useCharactersQuery(user?.id);
 
   useEffect(() => {
     if (error) {

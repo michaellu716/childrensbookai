@@ -17,10 +17,17 @@ export interface Character {
   user_id: string;
 }
 
-const fetchCharacters = async (): Promise<Character[]> => {
-  const { data: charactersData, error } = await supabase
+const fetchCharacters = async (userId?: string): Promise<Character[]> => {
+  let query = supabase
     .from('character_sheets')
-    .select('*')
+    .select('*');
+
+  // If userId is provided, filter by user_id
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+
+  const { data: charactersData, error } = await query
     .order('likes', { ascending: false })
     .order('created_at', { ascending: false });
 
@@ -29,10 +36,10 @@ const fetchCharacters = async (): Promise<Character[]> => {
   return charactersData || [];
 };
 
-export const useCharactersQuery = () => {
+export const useCharactersQuery = (userId?: string) => {
   return useQuery({
-    queryKey: ['characters'],
-    queryFn: fetchCharacters,
+    queryKey: ['characters', userId],
+    queryFn: () => fetchCharacters(userId),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
