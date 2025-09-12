@@ -85,10 +85,12 @@ export const StoryCard = ({ story, onLike, onTogglePublic, isPublicView = false 
           {/* Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           
-          {/* Status Badge */}
-          <div className="absolute top-2 right-2 z-10">
-            {getStatusBadge(story.status)}
-          </div>
+          {/* Status Badge - Only show for private library view */}
+          {!isPublicView && (
+            <div className="absolute top-2 right-2 z-10">
+              {getStatusBadge(story.status)}
+            </div>
+          )}
           
           {/* Like Button - Show only if not in public view or make it read-only */}
           {!isPublicView ? (
