@@ -27,6 +27,15 @@ const Auth = () => {
       }
     };
     checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        navigate(redirectPath);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate, redirectPath]);
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -89,7 +98,7 @@ const Auth = () => {
         }
       } else {
         toast.success('Welcome back!');
-        navigate(redirectPath);
+        // The auth state change listener will handle the redirect
       }
     } catch (error: any) {
       toast.error('An unexpected error occurred');
