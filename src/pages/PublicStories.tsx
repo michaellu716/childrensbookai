@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { BookOpen, Search, Users, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import { usePublicStoriesQuery, type PublicStory } from "@/hooks/usePublicStoriesQuery";
 import { StoryCard } from "@/components/StoryCard";
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 const STORIES_PER_PAGE = 24;
 
@@ -15,6 +17,23 @@ const PublicStories = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [user, setUser] = useState<User | null>(null);
+
+  // Check authentication status
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Memoize filtered stories and statistics
   const { filteredStories, totalCharacters } = useMemo(() => {
@@ -104,12 +123,25 @@ const PublicStories = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={() => navigate('/auth')}>
-                Sign In
-              </Button>
-              <Button onClick={() => navigate('/auth')} className="shadow-glow hover:shadow-glow/80 transition-all">
-                Create Story
-              </Button>
+              {user ? (
+                <>
+                  <Button variant="outline" onClick={() => navigate('/library')}>
+                    My Library
+                  </Button>
+                  <Button onClick={() => navigate('/create')} className="shadow-glow hover:shadow-glow/80 transition-all">
+                    Create Story
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => navigate('/auth?redirect=/public-stories')}>
+                    Sign In
+                  </Button>
+                  <Button onClick={() => navigate('/auth?redirect=/public-stories')} className="shadow-glow hover:shadow-glow/80 transition-all">
+                    Create Story
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -193,8 +225,8 @@ const PublicStories = () => {
                   : "Be the first to share a story with the community!"
                 }
               </p>
-              <Button onClick={() => navigate('/auth')} className="shadow-glow hover:shadow-glow/80 transition-all">
-                Create Your Story
+              <Button onClick={() => user ? navigate('/create') : navigate('/auth?redirect=/public-stories')} className="shadow-glow hover:shadow-glow/80 transition-all">
+                {user ? 'Create Your Story' : 'Sign In to Create Stories'}
               </Button>
             </div>
           </div>
