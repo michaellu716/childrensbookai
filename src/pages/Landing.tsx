@@ -75,14 +75,24 @@ const Landing = () => {
                   <Sparkles className="mr-2 h-5 w-5" />
                   Create a Story
                 </Button>
-                <Button 
-                  size="lg" 
-                  variant="outline" 
-                  onClick={() => navigate('/public-stories')}
-                  className="text-lg px-8 py-4 border-white/30 text-white hover:bg-white/10"
-                >
-                  See Examples
-                </Button>
+                <div className="flex flex-col xs:flex-row gap-3">
+                  <Button 
+                    size="lg" 
+                    variant="outline" 
+                    onClick={() => navigate('/public-stories')}
+                    className="text-lg px-6 py-4 border-white/30 text-white hover:bg-white/10"
+                  >
+                    See Stories
+                  </Button>
+                  <Button 
+                    size="lg" 
+                    variant="outline" 
+                    onClick={() => navigate('/public-characters')}
+                    className="text-lg px-6 py-4 border-white/30 text-white hover:bg-white/10"
+                  >
+                    See Characters
+                  </Button>
+                </div>
               </div>
               <div className="mt-8 p-4 bg-white/10 backdrop-blur rounded-lg border border-white/20">
                 <p className="text-white/80 text-sm">

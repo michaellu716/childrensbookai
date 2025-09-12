@@ -12,6 +12,7 @@ import Characters from "./pages/Characters";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import PublicStories from "./pages/PublicStories";
+import PublicCharacters from "./pages/PublicCharacters";
 import { AuthGuard } from "./components/AuthGuard";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
           } />
           <Route path="/landing" element={<Landing />} />
           <Route path="/public-stories" element={<PublicStories />} />
+          <Route path="/public-characters" element={<PublicCharacters />} />
           <Route path="/create" element={
             <AuthGuard>
               <CreateStory />
