@@ -234,6 +234,45 @@ const Library = () => {
     }
   };
 
+  const handleTogglePublic = async (storyId: string, isPublic: boolean) => {
+    try {
+      const storyToUpdate = stories.find(s => s.id === storyId);
+      if (!storyToUpdate) return;
+
+      // Optimistic update
+      queryClient.setQueryData(['stories'], (oldData: Story[] | undefined) => 
+        oldData?.map(story => 
+          story.id === storyId 
+            ? { ...story, is_public: isPublic }
+            : story
+        ) || []
+      );
+
+      const { error } = await supabase
+        .from('stories')
+        .update({ is_public: isPublic })
+        .eq('id', storyId);
+
+      if (error) {
+        // Revert optimistic update on error
+        queryClient.setQueryData(['stories'], (oldData: Story[] | undefined) => 
+          oldData?.map(story => 
+            story.id === storyId 
+              ? { ...story, is_public: storyToUpdate.is_public }
+              : story
+          ) || []
+        );
+        throw error;
+      }
+
+      toast.success(isPublic ? "Story made public!" : "Story made private!");
+    } catch (err) {
+      const message = (err as any)?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      console.error('Error updating story privacy:', err);
+      toast.error(`Failed to update story privacy: ${message}`);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
@@ -412,7 +451,7 @@ const Library = () => {
               {/* Story Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                 {paginatedStories.map((story) => (
-                  <StoryCard key={story.id} story={story} onLike={handleLike} />
+                  <StoryCard key={story.id} story={story} onLike={handleLike} onTogglePublic={handleTogglePublic} />
                 ))}
               </div>
 

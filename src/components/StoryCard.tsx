@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Star } from "lucide-react";
+import { BookOpen, Star, Globe, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LazyImage } from "./LazyImage";
 import { useStoryImageQuery } from "@/hooks/useStoriesQuery";
@@ -19,14 +19,16 @@ interface Story {
   user_id: string;
   likes: number;
   first_page_image?: string;
+  is_public?: boolean;
 }
 
 interface StoryCardProps {
   story: Story;
   onLike: (storyId: string) => void;
+  onTogglePublic?: (storyId: string, isPublic: boolean) => void;
 }
 
-export const StoryCard = ({ story, onLike }: StoryCardProps) => {
+export const StoryCard = ({ story, onLike, onTogglePublic }: StoryCardProps) => {
   const navigate = useNavigate();
   
   // Use lazy loading for images if not already loaded
@@ -100,6 +102,21 @@ export const StoryCard = ({ story, onLike }: StoryCardProps) => {
             <Star className="h-3 w-3 fill-current" />
             <span className="ml-1 text-xs hidden group-hover:inline">{story.likes || 0}</span>
           </Button>
+
+          {/* Public/Private Toggle */}
+          {onTogglePublic && (
+            <Button 
+              size="sm" 
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePublic(story.id, !story.is_public);
+              }}
+              className="absolute bottom-2 left-2 z-10 text-white hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 h-7 w-7 p-0"
+            >
+              {story.is_public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+            </Button>
+          )}
         </div>
         
         {/* Book Title on Spine */}

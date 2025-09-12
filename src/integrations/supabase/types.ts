@@ -94,6 +94,7 @@ export type Database = {
           child_name: string | null
           created_at: string | null
           id: string
+          is_public: boolean | null
           language: string | null
           length: number | null
           lesson: string | null
@@ -116,6 +117,7 @@ export type Database = {
           child_name?: string | null
           created_at?: string | null
           id?: string
+          is_public?: boolean | null
           language?: string | null
           length?: number | null
           lesson?: string | null
@@ -138,6 +140,7 @@ export type Database = {
           child_name?: string | null
           created_at?: string | null
           id?: string
+          is_public?: boolean | null
           language?: string | null
           length?: number | null
           lesson?: string | null
