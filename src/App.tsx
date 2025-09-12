@@ -36,11 +36,7 @@ const App = () => (
               <CreateStory />
             </AuthGuard>
           } />
-          <Route path="/review" element={
-            <AuthGuard>
-              <ReviewStory />
-            </AuthGuard>
-          } />
+          <Route path="/review" element={<ReviewStory />} />
           <Route path="/library" element={
             <AuthGuard>
               <Library />

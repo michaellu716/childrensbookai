@@ -38,6 +38,7 @@ interface Story {
 
 interface StoryViewerProps {
   storyId: string;
+  isPublicView?: boolean;
 }
 
 // Lazy loading image component
@@ -97,7 +98,7 @@ const LazyImage: React.FC<{
   );
 };
 
-export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
+export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView = false }) => {
   const [story, setStory] = useState<Story | null>(null);
   const [pages, setPages] = useState<StoryPage[]>([]);
   const [generations, setGenerations] = useState<StoryGeneration[]>([]);
@@ -688,27 +689,30 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
           </Alert>
         )}
 
-        <div className="flex gap-3 justify-center">
-          <Button 
-            onClick={retryIllustrations}
-            disabled={retryingIllustrations}
-          >
-            {retryingIllustrations ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Retrying...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Retry Illustrations
-              </>
-            )}
-          </Button>
-          <Button variant="outline" onClick={() => window.location.href = '/create'}>
-            Create New Story
-          </Button>
-        </div>
+        {/* Action buttons - Only show for authenticated users */}
+        {!isPublicView && (
+          <div className="flex gap-3 justify-center">
+            <Button 
+              onClick={retryIllustrations}
+              disabled={retryingIllustrations}
+            >
+              {retryingIllustrations ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Retrying...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry Illustrations
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => window.location.href = '/create'}>
+              Create New Story
+            </Button>
+          </div>
+        )}
 
         {/* Show story text if available */}
         {pages.length > 0 && (
@@ -879,18 +883,20 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
                     </div>
                   )}
                   
-                  {/* Edit button for text */}
-                  <div className="flex justify-center mt-4">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => startEditing(currentPageData.id, currentPageData.text_content)}
-                      disabled={story?.status === 'generating'}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Text
-                    </Button>
-                  </div>
+                  {/* Edit button for text - Only show for authenticated users */}
+                  {!isPublicView && (
+                    <div className="flex justify-center mt-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => startEditing(currentPageData.id, currentPageData.text_content)}
+                        disabled={story?.status === 'generating'}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Text
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -936,17 +942,19 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId }) => {
         </Button>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-center gap-4">
-        <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
-          {isDownloadingPDF ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4 mr-2" />
-          )}
-          Download PDF
-        </Button>
-      </div>
+      {/* Action Buttons - Only show for authenticated users */}
+      {!isPublicView && (
+        <div className="flex justify-center gap-4">
+          <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
+            {isDownloadingPDF ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Download PDF
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

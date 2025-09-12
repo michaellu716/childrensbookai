@@ -58,7 +58,7 @@ export const StoryCard = ({ story, onLike, onTogglePublic, isPublicView = false 
       {/* Book Cover */}
       <div 
         className="relative bg-gradient-to-br from-primary/10 via-background to-accent/10 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 transform hover:-translate-y-1 hover:rotate-1 cursor-pointer border border-border/20 perspective-1000"
-        onClick={() => navigate(`/review?storyId=${story.id}`)}
+        onClick={() => navigate(`/review?storyId=${story.id}&from=public-stories`)}
         style={{
           transformStyle: 'preserve-3d',
           boxShadow: '0 8px 25px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1) inset'

@@ -7,6 +7,8 @@ import { Slider } from "@/components/ui/slider";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Download, Share, Save, RefreshCw, BookOpen, Edit3 } from "lucide-react";
 import { StoryViewer } from "@/components/StoryViewer";
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 const ReviewStory = () => {
   const navigate = useNavigate();
@@ -16,6 +18,37 @@ const ReviewStory = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [toneSlider, setToneSlider] = useState([50]);
+  const [user, setUser] = useState<User | null>(null);
+
+  // Check authentication status
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const getBackNavigation = () => {
+    const referrer = searchParams.get('from');
+    
+    if (referrer === 'public-stories') {
+      return { path: '/public-stories', label: 'Back to Gallery' };
+    }
+    
+    if (user) {
+      return { path: '/library', label: 'Back to Library' };
+    }
+    
+    return { path: '/public-stories', label: 'Back to Gallery' };
+  };
   
   // Mock story data for demo
   const [storyData, setStoryData] = useState({
@@ -107,15 +140,17 @@ const ReviewStory = () => {
 
   // If there's a storyId, use the new StoryViewer component
   if (storyId) {
+    const backNav = getBackNavigation();
+    
     return (
       <div className="min-h-screen bg-background">
         {/* Header */}
         <header className="border-b border-border bg-background/95 backdrop-blur">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
-              <Button variant="ghost" onClick={() => navigate('/create')}>
+              <Button variant="ghost" onClick={() => navigate(backNav.path)}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Creator
+                {backNav.label}
               </Button>
               <div className="flex items-center space-x-2">
                 <BookOpen className="h-6 w-6 text-primary" />
@@ -128,7 +163,7 @@ const ReviewStory = () => {
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="max-w-4xl mx-auto">
-            <StoryViewer storyId={storyId} />
+            <StoryViewer storyId={storyId} isPublicView={!user} />
           </div>
         </div>
       </div>
