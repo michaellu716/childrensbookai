@@ -78,6 +78,7 @@ const Landing = () => {
                 <Button 
                   size="lg" 
                   variant="outline" 
+                  onClick={() => navigate('/library')}
                   className="text-lg px-8 py-4 border-white/30 text-white hover:bg-white/10"
                 >
                   See Examples
