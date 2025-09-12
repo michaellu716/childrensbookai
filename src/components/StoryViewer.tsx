@@ -117,11 +117,22 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
   const [imageCache, setImageCache] = useState<Record<string, string>>({});
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
   
-  // Text-to-speech
+  // Text-to-speech with auto-advance callback
   const { speak, stop, pause, resume, isSupported: ttsSupported, isPlaying: ttsPlaying, isPaused: ttsPaused, voices } = useTextToSpeech({
     rate: 0.85,
     pitch: 0.95,
     volume: 1,
+    onSpeechEnd: () => {
+      // Auto-advance to next page when TTS finishes, with a smooth delay
+      console.log('TTS finished, auto-advancing to next page');
+      setTimeout(() => {
+        const totalPages = pages.length + 1;
+        if (currentPage < totalPages - 1) {
+          setCurrentPage(prev => prev + 1);
+          setHasUserNavigated(true);
+        }
+      }, 1200); // 1.2 second delay for better UX
+    }
   });
   
   const [hasUserNavigated, setHasUserNavigated] = useState(false);
@@ -753,7 +764,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
       {/* Page Display */}
       {isEndPage ? (
         /* The End Page */
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden animate-fade-in">
           <div className="aspect-[4/3] bg-gradient-to-br from-primary/20 via-accent/10 to-primary/20 relative mb-0 flex items-center justify-center">
             <div className="text-center space-y-6">
               <div className="text-6xl mb-4">📖</div>
@@ -773,8 +784,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
           </div>
         </Card>
       ) : currentPageData ? (
-        <Card className="overflow-hidden">
-          <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-secondary/10 relative mb-0">
+        <Card className="overflow-hidden animate-fade-in">
+          <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-secondary/10 relative mb-0 animate-scale-in">
             <LazyImage
               pageId={currentPageData.id}
               loadImage={loadPageImage}

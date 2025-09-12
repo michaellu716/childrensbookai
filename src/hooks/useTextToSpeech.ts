@@ -5,6 +5,7 @@ interface UseTextToSpeechOptions {
   pitch?: number;
   volume?: number;
   voice?: SpeechSynthesisVoice | null;
+  onSpeechEnd?: () => void;
 }
 
 interface UseTextToSpeechReturn {
@@ -24,6 +25,7 @@ export const useTextToSpeech = (options: UseTextToSpeechOptions = {}): UseTextTo
     pitch = 1,
     volume = 1,
     voice = null,
+    onSpeechEnd,
   } = options;
 
   const [isSupported, setIsSupported] = useState(false);
@@ -108,6 +110,11 @@ export const useTextToSpeech = (options: UseTextToSpeechOptions = {}): UseTextTo
       setIsPlaying(false);
       setIsPaused(false);
       utteranceRef.current = null;
+      
+      // Call the callback if provided
+      if (onSpeechEnd) {
+        onSpeechEnd();
+      }
     };
 
     utterance.onerror = (event) => {
