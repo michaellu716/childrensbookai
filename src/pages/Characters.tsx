@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useCharactersQuery, type Character } from "@/hooks/useCharactersQuery";
 import { CharacterCard } from "@/components/CharacterCard";
 import { useQueryClient } from '@tanstack/react-query';
+import { Footer } from "@/components/Footer";
 
 const CHARACTERS_PER_PAGE = 24;
 
@@ -380,6 +381,7 @@ const Characters = () => {
           </div>
         </section>
       </div>
+      <Footer />
     </div>
   );
 };

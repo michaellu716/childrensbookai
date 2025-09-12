@@ -11,6 +11,7 @@ import { useReactToPrint } from 'react-to-print';
 import { useStoriesQuery, type Story } from "@/hooks/useStoriesQuery";
 import { StoryCard } from "@/components/StoryCard";
 import { useQueryClient } from '@tanstack/react-query';
+import { Footer } from "@/components/Footer";
 
 const STORIES_PER_PAGE = 24;
 
@@ -613,6 +614,7 @@ const Library = () => {
           )}
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

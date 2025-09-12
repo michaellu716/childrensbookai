@@ -8,6 +8,7 @@ import { CharacterCard } from "@/components/CharacterCard";
 import { useCharactersQuery } from "@/hooks/useCharactersQuery";
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
+import { Footer } from "@/components/Footer";
 
 export default function PublicCharacters() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -164,6 +165,7 @@ export default function PublicCharacters() {
           </Card>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

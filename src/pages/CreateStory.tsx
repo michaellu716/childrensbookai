@@ -14,6 +14,7 @@ import { AvatarStyleSelector } from "@/components/AvatarStyleSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Footer } from "@/components/Footer";
 
 const CreateStory = () => {
   const navigate = useNavigate();
@@ -699,9 +700,10 @@ const CreateStory = () => {
             ) : null}
            </div>
          </div>
-       </div>
-     </div>
-   </ErrorBoundary>
+        </div>
+      </div>
+      <Footer />
+    </ErrorBoundary>
  );
 };
 

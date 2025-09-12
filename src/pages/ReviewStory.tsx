@@ -9,6 +9,7 @@ import { ArrowLeft, Download, Share, Save, RefreshCw, BookOpen, Edit3 } from "lu
 import { StoryViewer } from "@/components/StoryViewer";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
+import { Footer } from "@/components/Footer";
 
 const ReviewStory = () => {
   const navigate = useNavigate();
@@ -360,6 +361,7 @@ const ReviewStory = () => {
           </Card>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

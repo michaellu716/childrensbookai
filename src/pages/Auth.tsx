@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BookOpen, Sparkles, Users, Heart } from 'lucide-react';
+import { Footer } from '@/components/Footer';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -248,6 +249,7 @@ const Auth = () => {
           </Tabs>
         </Card>
       </div>
+      <Footer />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { usePublicStoriesQuery, type PublicStory } from "@/hooks/usePublicStorie
 import { StoryCard } from "@/components/StoryCard";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
+import { Footer } from "@/components/Footer";
 
 const STORIES_PER_PAGE = 24;
 
@@ -299,6 +300,7 @@ const PublicStories = () => {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 };
