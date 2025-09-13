@@ -34,12 +34,19 @@ serve(async (req) => {
     
     // Process each storage file
     for (const file of storageFiles || []) {
-      if (!file.name.includes('/')) continue;
+      if (!file.name || !file.name.includes('/')) {
+        console.log(`Skipping file without folder structure: ${file.name}`);
+        continue;
+      }
+      
+      console.log(`Processing file: ${file.name}`);
       
       // Parse the file path: story-{storyId}/page-{pageNumber}-{timestamp}.webp
       const pathParts = file.name.split('/');
       const storyFolder = pathParts[0]; // e.g., "story-6db292bb-befb-4b72-a32d-108b86d984a4"
       const fileName = pathParts[1]; // e.g., "page-2-1757767897710.webp"
+      
+      console.log(`Story folder: ${storyFolder}, File name: ${fileName}`);
       
       const storyId = storyFolder.replace('story-', '');
       const pageMatch = fileName.match(/page-(\d+)-/);
@@ -51,19 +58,35 @@ serve(async (req) => {
       
       const pageNumber = parseInt(pageMatch[1]);
       
+      console.log(`Parsed: storyId=${storyId}, pageNumber=${pageNumber}`);
+      
       // Get the public URL for this image
       const { data: { publicUrl } } = supabase.storage
         .from('story-images')
         .getPublicUrl(file.name);
         
-      console.log(`Reconnecting story ${storyId}, page ${pageNumber} to ${publicUrl}`);
+      console.log(`Public URL: ${publicUrl}`);
+      
+      // Check if the story page exists
+      const { data: existingPage, error: checkError } = await supabase
+        .from('story_pages')
+        .select('id, story_id, page_number, image_url')
+        .eq('story_id', storyId)
+        .eq('page_number', pageNumber)
+        .single();
+        
+      if (checkError || !existingPage) {
+        console.log(`No matching page found for story ${storyId}, page ${pageNumber}:`, checkError);
+        continue;
+      }
+      
+      console.log(`Found matching page:`, existingPage);
       
       // Update the corresponding story page
       const { error: updateError } = await supabase
         .from('story_pages')
         .update({ image_url: publicUrl })
-        .eq('story_id', storyId)
-        .eq('page_number', pageNumber);
+        .eq('id', existingPage.id);
         
       if (updateError) {
         console.error(`Failed to update page ${pageNumber} for story ${storyId}:`, updateError);

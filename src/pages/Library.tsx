@@ -396,50 +396,6 @@ const Library = () => {
 
         {/* Story Grid */}
         <section className="mb-16">
-          {/* Quick regeneration help */}
-          {stories.length > 0 && (
-            <div className="mb-8 max-w-4xl mx-auto">
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <RefreshCw className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                      Reconnect Your Existing Story Images
-                    </h3>
-                    <p className="text-blue-700 dark:text-blue-300 mb-4">
-                      Your story images exist in storage but just need to be reconnected to your stories. This will be instant!
-                    </p>
-                    <Button 
-                      onClick={async () => {
-                        toast.info('Reconnecting existing images...');
-                        
-                        try {
-                          const { data, error } = await supabase.functions.invoke('reconnect-existing-images');
-                          
-                          if (error) throw error;
-                          
-                          toast.success(`Successfully reconnected ${data.reconnectedCount} images!`);
-                          
-                          // Refresh the stories to show the reconnected images
-                          queryClient.invalidateQueries({ queryKey: ['stories'] });
-                          
-                        } catch (error) {
-                          console.error('Failed to reconnect images:', error);
-                          toast.error('Failed to reconnect images');
-                        }
-                      }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Reconnect Existing Images
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {filteredStories.length === 0 ? (
             <div className="max-w-2xl mx-auto">
