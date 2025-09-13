@@ -132,47 +132,49 @@ const StoryImage: React.FC<{
         <div className="flex flex-col gap-3">
           <span className="text-lg text-muted-foreground font-medium">Image not available</span>
           <Button 
-            variant="outline" 
+            variant="default" 
             onClick={async () => {
               try {
-                // Generate image directly using OpenAI API
-                const prompt = `Create a wholesome Disney-style cartoon children's book illustration showing: With gentle fingers, Radima carefully removed the twig from the bird's feathers. 'Thank you, Radima!' chirped the bird, flapping its wings in excitement. Radima felt her heart fill with joy knowing she had helped another animal.
-
-Character appearance (maintain consistency):
-- Child named Radima
-- Hair: black long with a ponytail and side bangs
-- Eyes: dark brown
-- Skin: rich brown
-- Clothing: traditional Indian attire with a colorful lehenga and dupatta
-
-Style: Disney-style cartoon art style, bright cheerful colors, safe family-friendly content, whimsical storybook illustration, detailed pleasant background, consistent character design, appealing to young children ages 3-8`;
-
-                // Copy prompt to clipboard and show alert
-                await navigator.clipboard.writeText(prompt);
-                alert(`✅ AI Image Prompt copied to clipboard!\n\nYou can now paste this into:\n• DALL-E (openai.com)\n• Midjourney\n• Stable Diffusion\n• Any AI image generator\n\nThe prompt is specifically crafted for this page showing Radima helping the bird.`);
-              } catch (error) {
-                // Fallback if clipboard fails
-                const prompt = `Create a wholesome Disney-style cartoon children's book illustration showing: With gentle fingers, Radima carefully removed the twig from the bird's feathers. 'Thank you, Radima!' chirped the bird, flapping its wings in excitement. Radima felt her heart fill with joy knowing she had helped another animal.
-
-Character appearance (maintain consistency):
-- Child named Radima
-- Hair: black long with a ponytail and side bangs
-- Eyes: dark brown
-- Skin: rich brown
-- Clothing: traditional Indian attire with a colorful lehenga and dupatta
-
-Style: Disney-style cartoon art style, bright cheerful colors, safe family-friendly content, whimsical storybook illustration, detailed pleasant background, consistent character design, appealing to young children ages 3-8`;
+                setGenerating(true);
+                console.log(`Generating image for page ${pageNumber}...`);
                 
-                alert(`AI Image Prompt for this page:\n\n${prompt}\n\nCopy this text and use it with DALL-E, Midjourney, or any AI image generator.`);
+                const response = await supabase.functions.invoke('generate-page-image', {
+                  body: { 
+                    storyId: storyId,
+                    pageNumber: pageNumber
+                  }
+                });
+
+                if (response.error) {
+                  console.error('Error generating image:', response.error);
+                  setImageError(true);
+                } else {
+                  console.log('Image generated successfully:', response.data);
+                  setImageUrl(response.data?.imageUrl);
+                  // Refresh the page to show the new image
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 1000);
+                }
+              } catch (err) {
+                console.error('Error generating image:', err);
+                setImageError(true);
+              } finally {
+                setGenerating(false);
               }
             }}
-            className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950/20 group"
+            disabled={generating}
+            className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 text-primary-foreground"
           >
-            <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
-            Get AI Prompt
+            {generating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            {generating ? 'Generating...' : 'Generate Image'}
           </Button>
           <p className="text-sm text-muted-foreground text-center">
-            Get the AI prompt to generate this image manually
+            Click to generate this page's illustration
           </p>
         </div>
       </div>
@@ -722,7 +724,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
     
     setRetryingIllustrations(true);
     try {
-      const response = await supabase.functions.invoke('retry-story-illustrations', {
+      const response = await supabase.functions.invoke('regenerate-story-images', {
         body: { storyId: story.id }
       });
 
@@ -1129,6 +1131,21 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
       {/* Colorful Action Buttons - Only show for authenticated users */}
       {!isPublicView && (
         <div className="flex justify-center gap-8 pt-6">
+          {/* Check if story has missing images and show regenerate button */}
+          {pages.some(page => !page.image_url) && (
+            <Button 
+              onClick={retryIllustrations}
+              disabled={retryingIllustrations}
+              className="px-10 py-4 rounded-3xl font-bold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-r from-green-400 via-teal-500 to-blue-500 hover:from-green-500 hover:via-teal-600 hover:to-blue-600 text-white group"
+            >
+              {retryingIllustrations ? (
+                <Loader2 className="h-6 w-6 mr-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-6 w-6 mr-3 group-hover:rotate-180 transition-transform" />
+              )}
+              Regenerate Images
+            </Button>
+          )}
           <Button 
             onClick={handleDownloadPDF} 
             disabled={isDownloadingPDF}
