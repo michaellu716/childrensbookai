@@ -14,39 +14,16 @@ export interface PublicStory {
   first_page_image?: string;
 }
 
-const fetchPublicStoriesWithImages = async (): Promise<PublicStory[]> => {
-  // Query public stories with their first page images
-  const { data: storiesData, error } = await supabase
-    .from('stories')
-    .select(`
-      id, title, child_name, child_age, themes, art_style, length, 
-      created_at, likes,
-      story_pages!inner(image_url)
-    `)
-    .eq('is_public', true)
-    .eq('story_pages.page_number', 1)
-    .order('likes', { ascending: false })
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-
-  // Transform the data to match the expected format
-  const storiesWithImages = (storiesData || []).map(story => ({
-    ...story,
-    first_page_image: (story as any).story_pages?.[0]?.image_url || null
-  }));
-
-  return storiesWithImages;
-};
-
-const fetchPublicStoriesBasic = async (): Promise<PublicStory[]> => {
-  // Fallback query for public stories without requiring first page images
+const fetchPublicStoriesOptimized = async (): Promise<PublicStory[]> => {
+  // Fast query - get public stories only, no joins to avoid timeouts
   const { data: storiesData, error } = await supabase
     .from('stories')
     .select('id, title, child_name, child_age, themes, art_style, length, created_at, likes')
     .eq('is_public', true)
+    .eq('status', 'completed') // Only show completed public stories
     .order('likes', { ascending: false })
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100); // Limit for performance
 
   if (error) throw error;
 
@@ -56,19 +33,10 @@ const fetchPublicStoriesBasic = async (): Promise<PublicStory[]> => {
 export const usePublicStoriesQuery = () => {
   return useQuery({
     queryKey: ['public-stories'],
-    queryFn: async () => {
-      try {
-        // Try optimized query first
-        return await fetchPublicStoriesWithImages();
-      } catch (error) {
-        console.warn('Optimized query failed, falling back to basic query:', error);
-        // Fallback to basic query without images
-        return await fetchPublicStoriesBasic();
-      }
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    queryFn: fetchPublicStoriesOptimized,
+    staleTime: 15 * 60 * 1000, // 15 minutes - longer cache for public content
+    gcTime: 30 * 60 * 1000, // 30 minutes
     refetchOnWindowFocus: false,
-    retry: 2,
+    retry: 1,
   });
 };

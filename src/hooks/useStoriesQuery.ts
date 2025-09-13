@@ -43,33 +43,25 @@ export const useStoriesQuery = () => {
   });
 };
 
-// Hook for lazy loading individual story images with better caching
+// Hook for lazy loading individual story images with better caching (including public stories)
 export const useStoryImageQuery = (storyId: string, enabled: boolean = true) => {
   return useQuery({
     queryKey: ['story-image', storyId],
     queryFn: async () => {
-      // Use the existing edge function for consistency and potential caching
-      const { data, error } = await supabase.functions.invoke('get-page-image', {
-        body: { 
-          storyId,
-          pageNumber: 1 
-        }
-      });
+      // Direct query that works for both private and public stories
+      const { data: firstPage, error } = await supabase
+        .from('story_pages')
+        .select('image_url')
+        .eq('story_id', storyId)
+        .eq('page_number', 1)
+        .maybeSingle();
       
       if (error) {
-        console.warn('Failed to get image via edge function, trying direct query');
-        // Fallback to direct query
-        const { data: firstPage } = await supabase
-          .from('story_pages')
-          .select('image_url')
-          .eq('story_id', storyId)
-          .eq('page_number', 1)
-          .maybeSingle();
-        
-        return firstPage?.image_url || null;
+        console.warn('Failed to get story image:', error);
+        return null;
       }
       
-      return data?.image_url || null;
+      return firstPage?.image_url || null;
     },
     enabled,
     staleTime: 60 * 60 * 1000, // 1 hour - longer cache for images
