@@ -406,10 +406,10 @@ const Library = () => {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                      Your Story Images Need to be Regenerated
+                      Your Story Images Need to be Restored
                     </h3>
                     <p className="text-blue-700 dark:text-blue-300 mb-4">
-                      The previous base64 images were cleared for better performance. Click below to regenerate images for all your stories.
+                      The base64 images were removed for better performance. We'll regenerate them and store them properly in Supabase Storage (not as base64 in the database).
                     </p>
                     <Button 
                       onClick={async () => {
