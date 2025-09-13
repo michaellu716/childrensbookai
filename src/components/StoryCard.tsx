@@ -4,6 +4,7 @@ import { BookOpen, Star, Globe, Lock, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LazyImage } from "./LazyImage";
 import { useStoryImageQuery } from "@/hooks/useStoriesQuery";
+import { useIntersectionObserver } from "./IntersectionObserver";
 
 interface Story {
   id: string;
@@ -32,11 +33,12 @@ interface StoryCardProps {
 
 export const StoryCard = ({ story, onLike, onTogglePublic, onDelete, isPublicView = false }: StoryCardProps) => {
   const navigate = useNavigate();
+  const { ref, hasIntersected } = useIntersectionObserver({ rootMargin: '100px' });
   
-  // Use lazy loading for images if not already loaded
-  const { data: lazyImage } = useStoryImageQuery(
+  // Use lazy loading for images with intersection observer for better performance
+  const { data: lazyImage, isLoading: imageLoading } = useStoryImageQuery(
     story.id, 
-    !story.first_page_image // Only fetch if we don't already have the image
+    hasIntersected && !story.first_page_image // Only fetch when visible and if we don't already have the image
   );
 
   const imageUrl = story.first_page_image || lazyImage;
@@ -55,7 +57,7 @@ export const StoryCard = ({ story, onLike, onTogglePublic, onDelete, isPublicVie
   };
 
   return (
-    <div className="group relative">
+    <div ref={ref} className="group relative">
       {/* Book Cover */}
       <div 
         className="relative bg-gradient-to-br from-primary/10 via-background to-accent/10 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 transform hover:-translate-y-1 hover:rotate-1 cursor-pointer border border-border/20 perspective-1000"
@@ -71,17 +73,24 @@ export const StoryCard = ({ story, onLike, onTogglePublic, onDelete, isPublicVie
         
         {/* Cover Image */}
         <div className="aspect-[2/3] relative overflow-hidden">
-          <LazyImage 
-            src={imageUrl}
-            alt={`${story.title} cover`}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            fallback={
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-4 text-center">
-                <BookOpen className="h-8 w-8 text-primary/60 mb-3" />
-                <h3 className="font-bold text-sm leading-tight text-primary/80 line-clamp-2">{story.title}</h3>
-              </div>
-            }
-          />
+          {hasIntersected ? (
+            <LazyImage 
+              src={imageUrl}
+              alt={`${story.title} cover`}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              fallback={
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-4 text-center">
+                  <BookOpen className="h-8 w-8 text-primary/60 mb-3" />
+                  <h3 className="font-bold text-sm leading-tight text-primary/80 line-clamp-2">{story.title}</h3>
+                </div>
+              }
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-4 text-center">
+              <BookOpen className="h-8 w-8 text-primary/60 mb-3" />
+              <h3 className="font-bold text-sm leading-tight text-primary/80 line-clamp-2">{story.title}</h3>
+            </div>
+          )}
           
           {/* Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

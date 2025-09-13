@@ -18,37 +18,14 @@ export interface Story {
   is_public?: boolean;
 }
 
-const fetchStoriesWithImages = async (): Promise<Story[]> => {
-  // Single optimized query to get stories with their first page images
-  const { data: storiesData, error } = await supabase
-    .from('stories')
-    .select(`
-      id, title, child_name, child_age, themes, art_style, length, 
-      created_at, status, updated_at, user_id, likes, is_public,
-      story_pages!inner(image_url)
-    `)
-    .eq('story_pages.page_number', 1)
-    .order('likes', { ascending: false })
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-
-  // Transform the data to match the expected format
-  const storiesWithImages = (storiesData || []).map(story => ({
-    ...story,
-    first_page_image: (story as any).story_pages?.[0]?.image_url || null
-  }));
-
-  return storiesWithImages;
-};
-
-const fetchStoriesBasic = async (): Promise<Story[]> => {
-  // Fallback query for stories without requiring first page images
+const fetchStoriesOptimized = async (): Promise<Story[]> => {
+  // Fast query - get stories only, no joins to avoid timeouts
   const { data: storiesData, error } = await supabase
     .from('stories')
     .select('id, title, child_name, child_age, themes, art_style, length, created_at, status, updated_at, user_id, likes, is_public')
     .order('likes', { ascending: false })
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100); // Limit initial load for performance
 
   if (error) throw error;
 
@@ -58,39 +35,45 @@ const fetchStoriesBasic = async (): Promise<Story[]> => {
 export const useStoriesQuery = () => {
   return useQuery({
     queryKey: ['stories'],
-    queryFn: async () => {
-      try {
-        // Try optimized query first
-        return await fetchStoriesWithImages();
-      } catch (error) {
-        console.warn('Optimized query failed, falling back to basic query:', error);
-        // Fallback to basic query without images
-        return await fetchStoriesBasic();
-      }
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    queryFn: fetchStoriesOptimized,
+    staleTime: 10 * 60 * 1000, // 10 minutes - longer cache
+    gcTime: 30 * 60 * 1000, // 30 minutes - longer garbage collection
     refetchOnWindowFocus: false,
-    retry: 2,
+    retry: 1, // Reduce retries for faster failure
   });
 };
 
-// Hook for lazy loading individual story images
+// Hook for lazy loading individual story images with better caching
 export const useStoryImageQuery = (storyId: string, enabled: boolean = true) => {
   return useQuery({
     queryKey: ['story-image', storyId],
     queryFn: async () => {
-      const { data: firstPage } = await supabase
-        .from('story_pages')
-        .select('image_url')
-        .eq('story_id', storyId)
-        .eq('page_number', 1)
-        .maybeSingle();
+      // Use the existing edge function for consistency and potential caching
+      const { data, error } = await supabase.functions.invoke('get-page-image', {
+        body: { 
+          storyId,
+          pageNumber: 1 
+        }
+      });
       
-      return firstPage?.image_url || null;
+      if (error) {
+        console.warn('Failed to get image via edge function, trying direct query');
+        // Fallback to direct query
+        const { data: firstPage } = await supabase
+          .from('story_pages')
+          .select('image_url')
+          .eq('story_id', storyId)
+          .eq('page_number', 1)
+          .maybeSingle();
+        
+        return firstPage?.image_url || null;
+      }
+      
+      return data?.image_url || null;
     },
     enabled,
-    staleTime: 30 * 60 * 1000, // 30 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
+    staleTime: 60 * 60 * 1000, // 1 hour - longer cache for images
+    gcTime: 2 * 60 * 60 * 1000, // 2 hours
+    retry: 1, // Quick failure for better UX
   });
 };
