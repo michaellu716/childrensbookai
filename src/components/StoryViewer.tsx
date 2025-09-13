@@ -41,7 +41,7 @@ interface StoryViewerProps {
   isPublicView?: boolean;
 }
 
-// Simple image component that uses the URL directly from story data
+// Enhanced image component that uses the URL directly from story data
 const StoryImage: React.FC<{ 
   imageUrl?: string | null; 
   alt?: string;
@@ -50,20 +50,20 @@ const StoryImage: React.FC<{
 
   if (!imageUrl || imageError) {
     return (
-      <div className="w-full aspect-video bg-muted rounded-lg flex flex-col items-center justify-center p-6">
-        <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
-        <span className="text-sm text-muted-foreground mb-3">Image not available</span>
+      <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
+        <AlertCircle className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
+        <span className="text-lg text-muted-foreground mb-6 font-serif">Image not available</span>
         {/* Show retry button for missing images */}
         <Button 
           variant="outline" 
-          size="sm"
           onClick={() => {
             // Get the story from the parent component
             const event = new CustomEvent('retryStoryImages');
             window.dispatchEvent(event);
           }}
+          className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-amber-300 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-950/20 group"
         >
-          <RefreshCw className="h-4 w-4 mr-2" />
+          <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
           Retry Images
         </Button>
       </div>
@@ -74,7 +74,7 @@ const StoryImage: React.FC<{
     <img
       src={imageUrl}
       alt={alt}
-      className="w-full aspect-video object-cover rounded-lg"
+      className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
       onError={() => setImageError(true)}
     />
   );
@@ -736,217 +736,261 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
   const totalPages = pages.length + 1; // Add 1 for "The End" page
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-8">
       {/* Story Header */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold mb-2">{story.title}</h1>
-        <div className="flex justify-center gap-2 mb-4">
-          <Badge variant="secondary">{story.art_style}</Badge>
-          <Badge variant="secondary">{story.length} pages</Badge>
-          <Badge variant="secondary">Featuring {story.child_name}</Badge>
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl font-serif font-bold text-foreground tracking-wide">{story.title}</h1>
+        <div className="flex justify-center gap-3">
+          <Badge variant="secondary" className="px-3 py-1 rounded-full font-medium">{story.art_style}</Badge>
+          <Badge variant="secondary" className="px-3 py-1 rounded-full font-medium">{story.length} pages</Badge>
+          <Badge variant="secondary" className="px-3 py-1 rounded-full font-medium">Featuring {story.child_name}</Badge>
         </div>
       </div>
 
-      {/* Page Display */}
-      {isEndPage ? (
-        /* The End Page */
-        <Card className="overflow-hidden animate-fade-in">
-          <div className="aspect-[4/3] bg-gradient-to-br from-primary/20 via-accent/10 to-primary/20 relative mb-0 flex items-center justify-center">
-            <div className="text-center space-y-6">
-              <div className="text-6xl mb-4">📖</div>
-              <h2 className="text-4xl font-bold text-primary mb-4">The End</h2>
-              <p className="text-lg text-muted-foreground italic">
-                We hope you enjoyed {story.child_name}'s magical adventure!
-              </p>
-              <div className="mt-8 text-sm text-muted-foreground">
-                ⭐ ⭐ ⭐
+      {/* Book Display */}
+      <div className="relative">
+        {/* Book Shadow and Base */}
+        <div className="absolute inset-x-4 bottom-0 h-8 bg-gradient-to-t from-black/20 to-transparent blur-xl rounded-full" />
+        
+        <div className="relative bg-gradient-to-br from-orange-100 via-amber-50 to-yellow-50 dark:from-amber-950/50 dark:via-orange-950/30 dark:to-yellow-950/50 rounded-2xl shadow-2xl border border-amber-200/50 dark:border-amber-800/30 overflow-hidden transform-gpu">
+          {/* Book Binding */}
+          <div className="absolute left-0 top-0 bottom-0 w-3 bg-gradient-to-b from-amber-800 via-orange-700 to-amber-900 shadow-inner" />
+          <div className="absolute left-3 top-0 bottom-0 w-px bg-amber-600/50" />
+          
+          {isEndPage ? (
+            /* The End Page */
+            <div className="min-h-[600px] p-12 flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10">
+              <div className="text-center space-y-8">
+                <div className="text-8xl mb-6 animate-float">📚</div>
+                <h2 className="text-5xl font-serif font-bold text-primary mb-6 tracking-wide">The End</h2>
+                <p className="text-xl text-muted-foreground italic font-serif max-w-md mx-auto leading-relaxed">
+                  We hope you enjoyed {story.child_name}'s magical adventure!
+                </p>
+                <div className="mt-12 text-2xl text-amber-600 space-x-2">
+                  <span className="animate-pulse">⭐</span>
+                  <span className="animate-pulse animation-delay-200">⭐</span>
+                  <span className="animate-pulse animation-delay-400">⭐</span>
+                </div>
+              </div>
+              
+              {/* Elegant Page Number */}
+              <div className="absolute top-8 right-8 text-sm text-muted-foreground font-serif">
+                Page {totalPages}
               </div>
             </div>
-            
-            {/* Page Number Indicator */}
-            <div className="absolute top-4 right-4 bg-black/60 text-white px-2 py-1 rounded">
-              {totalPages} / {totalPages}
-            </div>
-          </div>
-        </Card>
-      ) : currentPageData ? (
-        <Card className="overflow-hidden animate-fade-in">
-          <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-secondary/10 relative mb-0 animate-scale-in">
-            <StoryImage
-              imageUrl={currentPageData.image_url}
-              alt={`Page ${currentPageData.page_number}`}
-            />
-            
-            {/* Page Number Indicator */}
-            <div className="absolute top-4 right-4 bg-black/60 text-white px-2 py-1 rounded">
-              {currentPageData.page_number} / {totalPages}
-            </div>
-          </div>
-          
-          {/* Text Content */}
-          {currentPageData.text_content && (
-            <div className="px-6 py-4 bg-background -mt-1">
-              {editingPageId === currentPageData.id ? (
-                <div className="space-y-4">
-                  <Textarea
-                    value={editingText}
-                    onChange={(e) => setEditingText(e.target.value)}
-                    className="min-h-[120px] text-lg"
-                    placeholder="Enter page text..."
-                    maxLength={2000}
-                    disabled={story?.status === 'generating'}
-                  />
-                  <div className="flex justify-center gap-2">
-                    <Button 
-                      onClick={savePageText} 
-                      disabled={isSaving || editingText.trim() === currentPageData.text_content}
-                      size="sm"
-                    >
-                      {isSaving ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-2" />
-                      )}
-                      Save
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={cancelEditing}
-                      size="sm"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
+          ) : currentPageData ? (
+            <div className="min-h-[600px] flex flex-col lg:flex-row">
+              {/* Image Side */}
+              <div className="flex-1 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-950/20 dark:via-purple-950/20 dark:to-pink-950/20" />
+                <div className="relative h-full min-h-[300px] lg:min-h-[600px] p-6">
+                  <div className="h-full rounded-xl overflow-hidden shadow-lg border border-white/50 dark:border-white/10">
+                    <StoryImage
+                      imageUrl={currentPageData.image_url}
+                      alt={`Page ${currentPageData.page_number}`}
+                    />
                   </div>
-                  <p className="text-xs text-muted-foreground text-center">
-                    {editingText.length}/2000 characters
-                  </p>
                 </div>
-              ) : (
-                <>
-                  <p className="text-lg leading-relaxed text-center">
-                    {currentPageData.text_content}
-                  </p>
+                
+                {/* Page Number */}
+                <div className="absolute top-4 right-4 text-xs text-muted-foreground font-serif bg-white/80 dark:bg-black/60 px-2 py-1 rounded-lg backdrop-blur-sm">
+                  Page {currentPageData.page_number}
+                </div>
+              </div>
+              
+              {/* Text Side */}
+              {currentPageData.text_content && (
+                <div className="flex-1 relative bg-gradient-to-br from-cream-50 via-white to-cream-50 dark:from-gray-900/50 dark:via-gray-800/30 dark:to-gray-900/50">
+                  {/* Paper texture lines */}
+                  <div className="absolute inset-0 opacity-10 dark:opacity-5">
+                    {Array.from({ length: 20 }).map((_, i) => (
+                      <div key={i} className="h-px bg-blue-300 dark:bg-blue-600 mt-8 mx-6" />
+                    ))}
+                  </div>
                   
-                  {/* Text-to-Speech Controls */}
-                  {ttsSupported && (
-                    <div className="flex justify-center gap-2 mt-4">
-                      {!ttsPlaying ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => speak(currentPageData.text_content)}
-                          className="flex items-center gap-2"
-                        >
-                          <Play className="h-4 w-4" />
-                          Read Aloud
-                        </Button>
-                      ) : (
-                        <>
-                          {ttsPaused ? (
-                            <Button
+                  <div className="relative p-8 lg:p-12 h-full flex flex-col justify-center">
+                    {editingPageId === currentPageData.id ? (
+                      <div className="space-y-6">
+                        <Textarea
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          className="min-h-[200px] text-lg font-serif bg-white/50 dark:bg-black/20 border-amber-200 dark:border-amber-800 rounded-xl resize-none focus:ring-2 focus:ring-amber-500/50"
+                          placeholder="Enter page text..."
+                          maxLength={2000}
+                          disabled={story?.status === 'generating'}
+                        />
+                        <div className="flex justify-center gap-3">
+                          <Button 
+                            onClick={savePageText} 
+                            disabled={isSaving || editingText.trim() === currentPageData.text_content}
+                            className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 bg-emerald-600 hover:bg-emerald-700 text-white"
+                          >
+                            {isSaving ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Save className="h-4 w-4 mr-2" />
+                            )}
+                            Save Changes
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            onClick={cancelEditing}
+                            className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-amber-300 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-950/20"
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Cancel
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center font-serif">
+                          {editingText.length}/2000 characters
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-8">
+                        <p className="text-xl leading-relaxed font-serif text-gray-800 dark:text-gray-200 text-justify">
+                          {currentPageData.text_content}
+                        </p>
+                        
+                        {/* Modern Action Buttons */}
+                        <div className="flex flex-wrap justify-center gap-3">
+                          {/* Text-to-Speech Controls */}
+                          {ttsSupported && (
+                            <>
+                              {!ttsPlaying ? (
+                                <Button
+                                  variant="outline"
+                                  onClick={() => speak(currentPageData.text_content)}
+                                  className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950/20 group"
+                                >
+                                  <Play className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
+                                  Read Aloud
+                                </Button>
+                              ) : (
+                                <div className="flex gap-2">
+                                  {ttsPaused ? (
+                                    <Button
+                                      variant="outline"
+                                      onClick={resume}
+                                      className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-green-300 hover:bg-green-50 dark:border-green-700 dark:hover:bg-green-950/20"
+                                    >
+                                      <Play className="h-4 w-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      onClick={pause}
+                                      className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-yellow-300 hover:bg-yellow-50 dark:border-yellow-700 dark:hover:bg-yellow-950/20"
+                                    >
+                                      <Pause className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    onClick={stop}
+                                    className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-red-300 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-950/20"
+                                  >
+                                    <Square className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          
+                          {/* Edit button for text - Only show for authenticated users */}
+                          {!isPublicView && (
+                            <Button 
                               variant="outline"
-                              size="sm"
-                              onClick={resume}
-                              className="flex items-center gap-2"
+                              onClick={() => startEditing(currentPageData.id, currentPageData.text_content)}
+                              disabled={story?.status === 'generating'}
+                              className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-purple-300 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-950/20 group"
                             >
-                              <Play className="h-4 w-4" />
-                              Resume
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={pause}
-                              className="flex items-center gap-2"
-                            >
-                              <Pause className="h-4 w-4" />
-                              Pause
+                              <Edit className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
+                              Edit Text
                             </Button>
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={stop}
-                            className="flex items-center gap-2"
-                          >
-                            <Square className="h-4 w-4" />
-                            Stop
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Edit button for text - Only show for authenticated users */}
-                  {!isPublicView && (
-                    <div className="flex justify-center mt-4">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => startEditing(currentPageData.id, currentPageData.text_content)}
-                        disabled={story?.status === 'generating'}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Text
-                      </Button>
-                    </div>
-                  )}
-                </>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
-          )}
-        </Card>
-      ) : null}
+          ) : null}
+        </div>
+      </div>
 
-      {/* Navigation */}
-      <div className="flex justify-between items-center">
+      {/* Modern Navigation */}
+      <div className="flex justify-between items-center px-4">
         <Button
-          variant="outline"
           onClick={prevPage}
           disabled={currentPage === 0}
+          className={`px-8 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${
+            currentPage === 0 
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none hover:shadow-none hover:translate-y-0' 
+              : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white'
+          }`}
         >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Previous
+          <ChevronLeft className="h-5 w-5 mr-2" />
+          Previous Page
         </Button>
         
-        <div className="flex gap-2">
+        {/* Elegant Page Indicators */}
+        <div className="flex gap-3 px-6 py-2 bg-white/60 dark:bg-black/20 rounded-2xl backdrop-blur-sm border border-white/20 dark:border-white/10">
           {Array.from({ length: totalPages }).map((_, index) => (
             <button
               key={index}
               onClick={() => {
                 setCurrentPage(index);
-                setHasUserNavigated(true); // Mark as user navigation
+                setHasUserNavigated(true);
               }}
-              className={`w-3 h-3 rounded-full transition-colors ${
+              className={`relative w-4 h-4 rounded-full transition-all duration-300 hover:scale-125 ${
                 index === currentPage
-                  ? 'bg-primary'
-                  : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg'
+                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-amber-300 dark:hover:bg-amber-700'
               }`}
-            />
+            >
+              {index === currentPage && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 animate-pulse opacity-50" />
+              )}
+            </button>
           ))}
         </div>
         
         <Button
-          variant="outline"
           onClick={nextPage}
           disabled={currentPage === totalPages - 1}
+          className={`px-8 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${
+            currentPage === totalPages - 1
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none hover:shadow-none hover:translate-y-0'
+              : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white'
+          }`}
         >
-          Next
-          <ChevronRight className="h-4 w-4 ml-2" />
+          Next Page
+          <ChevronRight className="h-5 w-5 ml-2" />
         </Button>
       </div>
 
-      {/* Action Buttons - Only show for authenticated users */}
+      {/* Modern Action Buttons - Only show for authenticated users */}
       {!isPublicView && (
-        <div className="flex justify-center gap-4">
-          <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
+        <div className="flex justify-center gap-6 pt-4">
+          <Button 
+            onClick={handleDownloadPDF} 
+            disabled={isDownloadingPDF}
+            className="px-8 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white group"
+          >
             {isDownloadingPDF ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-5 w-5 mr-3 animate-spin" />
             ) : (
-              <Download className="h-4 w-4 mr-2" />
+              <Download className="h-5 w-5 mr-3 group-hover:scale-110 transition-transform" />
             )}
-            Download PDF
+            Download as PDF
+          </Button>
+          <Button 
+            onClick={handleShare}
+            className="px-8 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white group"
+          >
+            <Share2 className="h-5 w-5 mr-3 group-hover:scale-110 transition-transform" />
+            Share Story
           </Button>
         </div>
       )}
