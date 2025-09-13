@@ -41,19 +41,53 @@ interface StoryViewerProps {
   isPublicView?: boolean;
 }
 
-// Enhanced image component that uses the URL directly from story data
+// Enhanced image component that loads images lazily to avoid database timeouts
 const StoryImage: React.FC<{ 
-  imageUrl?: string | null; 
+  pageId: string;
   alt?: string;
-}> = ({ imageUrl, alt = "Story page" }) => {
+}> = ({ pageId, alt = "Story page" }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        setLoading(true);
+        const response = await supabase.functions.invoke('get-page-image', {
+          body: { pageId }
+        });
+
+        if (response.error) {
+          console.error('Error loading image:', response.error);
+          setImageError(true);
+        } else {
+          setImageUrl(response.data?.image_url);
+        }
+      } catch (err) {
+        console.error('Error loading image:', err);
+        setImageError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadImage();
+  }, [pageId]);
+
+  if (loading) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border border-gray-200 dark:border-gray-600 rounded-xl animate-pulse">
+        <div className="h-12 w-12 bg-gray-300 dark:bg-gray-600 rounded-full mb-4"></div>
+        <span className="text-lg text-muted-foreground font-medium">Loading image...</span>
+      </div>
+    );
+  }
 
   if (!imageUrl || imageError) {
     return (
       <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
         <AlertCircle className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
-        <span className="text-lg text-muted-foreground mb-6 font-serif">Image not available</span>
-        {/* Show retry button for missing images */}
         <div className="flex flex-col gap-3">
           <span className="text-lg text-muted-foreground font-medium">Image not available</span>
           <Button 
@@ -72,20 +106,32 @@ Character appearance (maintain consistency):
 
 Style: Disney-style cartoon art style, bright cheerful colors, safe family-friendly content, whimsical storybook illustration, detailed pleasant background, consistent character design, appealing to young children ages 3-8`;
 
-                // You can manually generate this image using DALL-E or another AI image generator
-                // For now, let's show a placeholder message
-                alert(`Image prompt ready:\n\n${prompt}\n\nYou can use this prompt with DALL-E, Midjourney, or any AI image generator to create the image for this page.`);
+                // Copy prompt to clipboard and show alert
+                await navigator.clipboard.writeText(prompt);
+                alert(`✅ AI Image Prompt copied to clipboard!\n\nYou can now paste this into:\n• DALL-E (openai.com)\n• Midjourney\n• Stable Diffusion\n• Any AI image generator\n\nThe prompt is specifically crafted for this page showing Radima helping the bird.`);
               } catch (error) {
-                console.error('Error:', error);
+                // Fallback if clipboard fails
+                const prompt = `Create a wholesome Disney-style cartoon children's book illustration showing: With gentle fingers, Radima carefully removed the twig from the bird's feathers. 'Thank you, Radima!' chirped the bird, flapping its wings in excitement. Radima felt her heart fill with joy knowing she had helped another animal.
+
+Character appearance (maintain consistency):
+- Child named Radima
+- Hair: black long with a ponytail and side bangs
+- Eyes: dark brown
+- Skin: rich brown
+- Clothing: traditional Indian attire with a colorful lehenga and dupatta
+
+Style: Disney-style cartoon art style, bright cheerful colors, safe family-friendly content, whimsical storybook illustration, detailed pleasant background, consistent character design, appealing to young children ages 3-8`;
+                
+                alert(`AI Image Prompt for this page:\n\n${prompt}\n\nCopy this text and use it with DALL-E, Midjourney, or any AI image generator.`);
               }
             }}
             className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950/20 group"
           >
             <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
-            Get Image Prompt
+            Get AI Prompt
           </Button>
           <p className="text-sm text-muted-foreground text-center">
-            Due to network issues, you can copy the AI prompt and generate the image manually
+            Get the AI prompt to generate this image manually
           </p>
         </div>
       </div>
@@ -844,7 +890,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
                 <div className="relative h-full min-h-[350px] lg:min-h-[700px] p-8">
                   <div className="h-full rounded-2xl overflow-hidden shadow-xl border-4 border-white dark:border-gray-600 bg-white dark:bg-gray-800">
                     <StoryImage
-                      imageUrl={currentPageData.image_url}
+                      pageId={currentPageData.id}
                       alt={`Page ${currentPageData.page_number}`}
                     />
                   </div>

@@ -43,7 +43,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Fetch story and run queries in parallel - but exclude large image_url data initially
+    // Fetch story and basic page info (NO image URLs to avoid timeout)
     const [
       { data: story, error: storyError },
       { data: pages, error: pagesError },
@@ -88,25 +88,6 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-
-    // Now fetch image URLs separately for pages that have them (more efficient)
-    if (pages && pages.length > 0) {
-      const { data: imageData, error: imageError } = await supabase
-        .from("story_pages")
-        .select("id, page_number, image_url")
-        .eq("story_id", storyId)
-        .not("image_url", "is", null);
-      
-      if (!imageError && imageData) {
-        // Merge image URLs back into pages data
-        pages.forEach(page => {
-          const imageInfo = imageData.find(img => img.page_number === page.page_number);
-          if (imageInfo) {
-            page.image_url = imageInfo.image_url;
-          }
-        });
-      }
     }
 
     if (!story) {

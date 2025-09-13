@@ -43,12 +43,12 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Fetch only the image_url for this specific page
+    // Fetch just the image_url for this specific page
     const { data: page, error: pageError } = await supabase
       .from("story_pages")
       .select("image_url")
       .eq("id", pageId)
-      .maybeSingle();
+      .single();
 
     if (pageError) {
       console.error("get-page-image: pageError", pageError);
@@ -58,7 +58,14 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ image_url: page?.image_url || null }), {
+    if (!page) {
+      return new Response(
+        JSON.stringify({ image_url: null }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(JSON.stringify({ image_url: page.image_url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
