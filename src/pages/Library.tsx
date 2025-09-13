@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Search, Plus, Download, Share, Trash2, Loader2, Printer, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, Search, Plus, Download, Share, Trash2, Loader2, Printer, Users, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useReactToPrint } from 'react-to-print';
@@ -394,8 +394,60 @@ const Library = () => {
           </div>
         </section>
 
-        {/* Stories Bookshelf */}
+        {/* Story Grid */}
         <section className="mb-16">
+          {/* Image regeneration notice */}
+          {stories.length > 0 && (
+            <div className="mb-8 max-w-4xl mx-auto">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <RefreshCw className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                      Story Images Need Regeneration
+                    </h3>
+                    <p className="text-amber-700 dark:text-amber-300 mb-4">
+                      We've optimized your story storage for better performance. Your story images need to be regenerated with our improved system.
+                    </p>
+                    <Button 
+                      onClick={async () => {
+                        if (!confirm('This will regenerate images for all your stories. This process may take several minutes. Continue?')) {
+                          return;
+                        }
+                        
+                        toast.info('Starting image regeneration for all stories...');
+                        
+                        for (const story of stories.slice(0, 5)) { // Limit to first 5 for now
+                          try {
+                            await supabase.functions.invoke('regenerate-story-images', {
+                              body: { storyId: story.id }
+                            });
+                            toast.success(`Started regenerating images for "${story.title}"`);
+                          } catch (error) {
+                            console.error(`Failed to start regeneration for ${story.title}:`, error);
+                            toast.error(`Failed to start regeneration for "${story.title}"`);
+                          }
+                        }
+                        
+                        toast.success('Image regeneration started for your stories!');
+                        // Refresh the page after a delay
+                        setTimeout(() => {
+                          window.location.reload();
+                        }, 2000);
+                      }}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Regenerate All Images
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {filteredStories.length === 0 ? (
             <div className="max-w-2xl mx-auto">
               <Card className="p-16 text-center bg-gradient-card border-0 shadow-card">
