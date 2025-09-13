@@ -119,42 +119,15 @@ serve(async (req) => {
     
     // GPT-Image-1 returns base64 data directly
     const base64Data = imageData.data[0].b64_json;
+    const imageUrl = `data:image/webp;base64,${base64Data}`;
     
-    // Convert base64 to binary data for storage
-    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-    
-    // Upload to Supabase Storage instead of storing as base64 in database
-    const fileName = `story-${storyId}/page-${pageNumber}-${Date.now()}.webp`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('story-images')
-      .upload(fileName, imageBuffer, {
-        contentType: 'image/webp',
-        cacheControl: '3600'
-      });
+    console.log(`Image generated successfully for page ${pageNumber}, storing as base64`);
 
-    if (uploadError) {
-      console.error(`Failed to upload image to storage:`, uploadError);
-      return new Response(JSON.stringify({ 
-        error: "Failed to upload image to storage", 
-        details: uploadError.message 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Get the public URL for the uploaded image
-    const { data: { publicUrl } } = supabase.storage
-      .from('story-images')
-      .getPublicUrl(fileName);
-
-    console.log(`Image uploaded to storage: ${publicUrl}`);
-
-    // Update the page with the storage URL (much smaller than base64)
+    // Update the page with the base64 image data (consistent with main story generation)
     const { error: updateError } = await supabase
       .from('story_pages')
       .update({ 
-        image_url: publicUrl,
+        image_url: imageUrl,
         image_prompt: imagePrompt
       })
       .eq('story_id', storyId)
@@ -171,11 +144,11 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Page ${pageNumber} image updated successfully`);
+    console.log(`Page ${pageNumber} image updated successfully with base64 data`);
 
     return new Response(JSON.stringify({ 
       success: true,
-      imageUrl: publicUrl,
+      imageUrl: imageUrl,
       page: pageNumber,
       prompt: imagePrompt
     }), {
