@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { BookOpen, Star, Globe, Lock, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LazyImage } from "./LazyImage";
+import { useStoryImageQuery } from "@/hooks/useStoriesQuery";
 
 interface Story {
   id: string;
@@ -31,6 +32,9 @@ interface StoryCardProps {
 
 export const StoryCard = ({ story, onLike, onTogglePublic, onDelete, isPublicView = false }: StoryCardProps) => {
   const navigate = useNavigate();
+  
+  // Fetch the first page image for this story
+  const { data: storyImageUrl } = useStoryImageQuery(story.id, true);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -62,15 +66,27 @@ export const StoryCard = ({ story, onLike, onTogglePublic, onDelete, isPublicVie
         
         {/* Cover Image */}
         <div className="aspect-[2/3] relative overflow-hidden">
-          <img 
-            src="/src/assets/hero-image.jpg" 
+          <LazyImage
+            src={storyImageUrl}
             alt={story.title}
             className="w-full h-full object-cover"
+            fallback={
+              <div className="w-full h-full bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-4 text-center">
+                <BookOpen className="h-8 w-8 text-primary/60 mb-3" />
+                <h3 className="font-bold text-sm leading-tight text-primary/80 line-clamp-2">{story.title}</h3>
+                <p className="text-xs text-primary/60 mt-2">Story cover</p>
+              </div>
+            }
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-background/20 to-accent/30 flex flex-col items-center justify-center p-4 text-center">
-            <BookOpen className="h-8 w-8 text-white/80 mb-3 drop-shadow-lg" />
-            <h3 className="font-bold text-sm leading-tight text-white drop-shadow-lg line-clamp-2">{story.title}</h3>
-          </div>
+          
+          {/* Overlay for story title when image is present */}
+          {storyImageUrl && (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end">
+              <div className="p-4 text-white">
+                <h3 className="font-bold text-sm leading-tight drop-shadow-lg line-clamp-2">{story.title}</h3>
+              </div>
+            </div>
+          )}
           
           {/* Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
