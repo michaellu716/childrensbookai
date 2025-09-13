@@ -1,0 +1,1 @@
+UPDATE stories SET status = 'completed' WHERE status = 'generating';
