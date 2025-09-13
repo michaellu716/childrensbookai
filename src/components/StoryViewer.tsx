@@ -333,7 +333,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
 
             const estimatedTotal = Number(s.length || p.length || 0);
             setTotalCount(estimatedTotal);
-            const completed = p.filter(pg => !!pg.image_url).length;
+            // For lazy loading, assume all pages are completed if story status is completed
+            const completed = s.status === 'completed' ? p.length : p.filter(pg => !!pg.image_url).length;
             setCompletedCount(completed);
 
             if (s.status === 'generating') {
@@ -535,17 +536,24 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
         const estimatedTotal = Number(storyWithCharacter.length || pagesData.length || 0);
         setTotalCount(estimatedTotal);
 
-        const { count: headCompleted } = await supabase
-          .from('story_pages')
-          .select('id', { count: 'exact', head: true })
-          .eq('story_id', storyId)
-          .not('image_url', 'is', null);
+        // For lazy loading, if story is completed, assume all pages are completed
+        if (storyWithCharacter.status === 'completed') {
+          setCompletedCount(pagesData.length);
+        } else {
+          const { count: headCompleted } = await supabase
+            .from('story_pages')
+            .select('id', { count: 'exact', head: true })
+            .eq('story_id', storyId)
+            .not('image_url', 'is', null);
 
-        const fallbackCompleted = pagesData.filter(p => !!p.image_url).length;
-        setCompletedCount(typeof headCompleted === 'number' ? headCompleted : fallbackCompleted);
+          const fallbackCompleted = pagesData.filter(p => !!p.image_url).length;
+          setCompletedCount(typeof headCompleted === 'number' ? headCompleted : fallbackCompleted);
+        }
       } catch (e) {
         console.warn('Count query failed, using fallback:', e);
-        setCompletedCount(pagesData.filter(p => !!p.image_url).length);
+        // For lazy loading, if story is completed, assume all pages are completed
+        const fallbackCompleted = storyWithCharacter.status === 'completed' ? pagesData.length : pagesData.filter(p => !!p.image_url).length;
+        setCompletedCount(fallbackCompleted);
         setTotalCount(Number(storyWithCharacter.length || pagesData.length || 0));
       }
 
