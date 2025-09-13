@@ -406,37 +406,34 @@ const Library = () => {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                      Your Story Images Need to be Restored
+                      Reconnect Your Existing Story Images
                     </h3>
                     <p className="text-blue-700 dark:text-blue-300 mb-4">
-                      The base64 images were removed for better performance. We'll regenerate them and store them properly in Supabase Storage (not as base64 in the database).
+                      Your story images exist in storage but just need to be reconnected to your stories. This will be instant!
                     </p>
                     <Button 
                       onClick={async () => {
-                        if (!confirm('This will regenerate images for all your stories. This may take a few minutes. Continue?')) {
-                          return;
+                        toast.info('Reconnecting existing images...');
+                        
+                        try {
+                          const { data, error } = await supabase.functions.invoke('reconnect-existing-images');
+                          
+                          if (error) throw error;
+                          
+                          toast.success(`Successfully reconnected ${data.reconnectedCount} images!`);
+                          
+                          // Refresh the stories to show the reconnected images
+                          queryClient.invalidateQueries({ queryKey: ['stories'] });
+                          
+                        } catch (error) {
+                          console.error('Failed to reconnect images:', error);
+                          toast.error('Failed to reconnect images');
                         }
-                        
-                        toast.info('Starting image regeneration...');
-                        
-                        for (const story of stories.filter(s => s.status === 'completed')) {
-                          try {
-                            await supabase.functions.invoke('regenerate-story-images', {
-                              body: { storyId: story.id }
-                            });
-                            toast.success(`Started regenerating images for "${story.title}"`);
-                          } catch (error) {
-                            console.error(`Failed to start regeneration for ${story.title}:`, error);
-                            toast.error(`Failed to start regeneration for "${story.title}"`);
-                          }
-                        }
-                        
-                        toast.info('Image regeneration started! This may take several minutes. You can refresh the page to see progress.');
                       }}
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
-                      Regenerate All Story Images
+                      Reconnect Existing Images
                     </Button>
                   </div>
                 </div>
