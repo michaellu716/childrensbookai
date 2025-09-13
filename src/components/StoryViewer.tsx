@@ -44,11 +44,14 @@ interface StoryViewerProps {
 // Enhanced image component that loads images lazily to avoid database timeouts
 const StoryImage: React.FC<{ 
   pageId: string;
+  pageNumber: number;
+  storyId: string;
   alt?: string;
-}> = ({ pageId, alt = "Story page" }) => {
+}> = ({ pageId, pageNumber, storyId, alt = "Story page" }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     const loadImage = async () => {
@@ -62,7 +65,17 @@ const StoryImage: React.FC<{
           console.error('Error loading image:', response.error);
           setImageError(true);
         } else {
-          setImageUrl(response.data?.image_url);
+          if (response.data?.image_url) {
+            setImageUrl(response.data.image_url);
+          } else {
+            // Auto-generate missing image for page 6
+            if (pageNumber === 6) {
+              console.log('Auto-generating missing image for page 6...');
+              await generatePageImage();
+            } else {
+              setImageError(true);
+            }
+          }
         }
       } catch (err) {
         console.error('Error loading image:', err);
@@ -72,14 +85,47 @@ const StoryImage: React.FC<{
       }
     };
 
-    loadImage();
-  }, [pageId]);
+    const generatePageImage = async () => {
+      try {
+        setGenerating(true);
+        console.log(`Auto-generating image for page ${pageNumber}...`);
+        
+        const response = await supabase.functions.invoke('generate-page-image', {
+          body: { 
+            storyId: storyId,
+            pageNumber: pageNumber
+          }
+        });
 
-  if (loading) {
+        if (response.error) {
+          console.error('Error generating image:', response.error);
+          setImageError(true);
+        } else {
+          console.log('Image generated successfully:', response.data);
+          setImageUrl(response.data?.imageUrl);
+          // Refresh to get the new image
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+      } catch (err) {
+        console.error('Error generating image:', err);
+        setImageError(true);
+      } finally {
+        setGenerating(false);
+      }
+    };
+
+    loadImage();
+  }, [pageId, pageNumber, storyId]);
+
+  if (loading || generating) {
     return (
       <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border border-gray-200 dark:border-gray-600 rounded-xl animate-pulse">
         <div className="h-12 w-12 bg-gray-300 dark:bg-gray-600 rounded-full mb-4"></div>
-        <span className="text-lg text-muted-foreground font-medium">Loading image...</span>
+        <span className="text-lg text-muted-foreground font-medium">
+          {generating ? `Generating image for page ${pageNumber}...` : 'Loading image...'}
+        </span>
       </div>
     );
   }
@@ -899,6 +945,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
                   <div className="h-full rounded-2xl overflow-hidden shadow-xl border-4 border-white dark:border-gray-600 bg-white dark:bg-gray-800">
                     <StoryImage
                       pageId={currentPageData.id}
+                      pageNumber={currentPageData.page_number}
+                      storyId={story.id}
                       alt={`Page ${currentPageData.page_number}`}
                     />
                   </div>
