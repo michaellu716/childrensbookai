@@ -16,6 +16,12 @@ export const LazyImage = ({ src, alt, className, fallback, onError }: LazyImageP
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
+    // Start loading immediately if no src or if src is already available
+    if (!src) {
+      setIsInView(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -23,7 +29,7 @@ export const LazyImage = ({ src, alt, className, fallback, onError }: LazyImageP
           observer.disconnect();
         }
       },
-      { threshold: 0.1, rootMargin: '50px' }
+      { threshold: 0.1, rootMargin: '200px' } // Increased rootMargin for earlier loading
     );
 
     if (imgRef.current) {
@@ -31,7 +37,7 @@ export const LazyImage = ({ src, alt, className, fallback, onError }: LazyImageP
     }
 
     return () => observer.disconnect();
-  }, []);
+  }, [src]);
 
   const handleLoad = () => setIsLoaded(true);
   
@@ -46,7 +52,7 @@ export const LazyImage = ({ src, alt, className, fallback, onError }: LazyImageP
 
   return (
     <div ref={imgRef} className="relative">
-      {!isLoaded && (
+      {!isLoaded && isInView && (
         <Skeleton className={`absolute inset-0 ${className}`} />
       )}
       {isInView && (
