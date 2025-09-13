@@ -136,8 +136,33 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
   }, []);
 
   useEffect(() => {
-    const handleRetryImages = () => {
-      retryIllustrations();
+    const handleRetryImages = async () => {
+      if (!story) return;
+      
+      setRetryingIllustrations(true);
+      try {
+        console.log('Calling regenerate-story-images function...');
+        const response = await supabase.functions.invoke('regenerate-story-images', {
+          body: { storyId: story.id }
+        });
+
+        if (response.error) {
+          console.error('Error regenerating images:', response.error);
+          toast.error('Failed to regenerate images');
+        } else {
+          console.log('Image regeneration response:', response.data);
+          toast.success('Images are being regenerated...');
+          // Update story status and refetch
+          setStory(prev => prev ? { ...prev, status: 'generating' } : null);
+          setIsPolling(true);
+          fetchStory();
+        }
+      } catch (err) {
+        console.error('Error calling regenerate function:', err);
+        toast.error('Failed to start image regeneration');
+      } finally {
+        setRetryingIllustrations(false);
+      }
     };
 
     window.addEventListener('retryStoryImages', handleRetryImages);
