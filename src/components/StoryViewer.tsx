@@ -50,9 +50,22 @@ const StoryImage: React.FC<{
 
   if (!imageUrl || imageError) {
     return (
-      <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center">
-        <AlertCircle className="h-8 w-8 text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Image not available</span>
+      <div className="w-full aspect-video bg-muted rounded-lg flex flex-col items-center justify-center p-6">
+        <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
+        <span className="text-sm text-muted-foreground mb-3">Image not available</span>
+        {/* Show retry button for missing images */}
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => {
+            // Get the story from the parent component
+            const event = new CustomEvent('retryStoryImages');
+            window.dispatchEvent(event);
+          }}
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry Images
+        </Button>
       </div>
     );
   }
@@ -122,6 +135,15 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
     };
   }, []);
 
+  useEffect(() => {
+    const handleRetryImages = () => {
+      retryIllustrations();
+    };
+
+    window.addEventListener('retryStoryImages', handleRetryImages);
+    return () => window.removeEventListener('retryStoryImages', handleRetryImages);
+  }, [story]);
+
   // Auto-play text when page changes
   useEffect(() => {
     if (ttsSupported && pages.length > 0 && pages[currentPage]?.text_content && story?.status !== 'generating' && hasUserNavigated) {
@@ -140,6 +162,15 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
   }, [currentPage, pages, ttsSupported, story?.status, hasUserNavigated]); // Added hasUserNavigated to dependencies
 
   // Reset autoplay guard when story changes
+  useEffect(() => {
+    const handleRetryImages = () => {
+      retryIllustrations();
+    };
+
+    window.addEventListener('retryStoryImages', handleRetryImages);
+    return () => window.removeEventListener('retryStoryImages', handleRetryImages);
+  }, [story]);
+
   useEffect(() => {
     setHasUserNavigated(false);
     stop();
