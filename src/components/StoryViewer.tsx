@@ -68,13 +68,8 @@ const StoryImage: React.FC<{
           if (response.data?.image_url) {
             setImageUrl(response.data.image_url);
           } else {
-            // Auto-generate missing image for page 6
-            if (pageNumber === 6) {
-              console.log('Auto-generating missing image for page 6...');
-              await generatePageImage();
-            } else {
-              setImageError(true);
-            }
+            // Simply show error instead of auto-generating to save OpenAI credits
+            setImageError(true);
           }
         }
       } catch (err) {
