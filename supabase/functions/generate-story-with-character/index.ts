@@ -366,7 +366,7 @@ async function generateStoryIllustrations(
     const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
     const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length;
     
-    console.log(`Illustration generation completed: ${successful} successful, ${failed} failed`);
+    console.log(`Initial illustration generation: ${successful} successful, ${failed} failed`);
 
     // After attempting all pages, verify completion
     const { data: missingPages, error: checkError } = await supabase
@@ -379,29 +379,127 @@ async function generateStoryIllustrations(
       console.error('Failed to verify missing pages:', checkError);
     }
 
+    // Retry failed pages up to 3 times
+    let retryAttempts = 0;
+    const maxRetries = 3;
+    let remainingFailedPages = missingPages || [];
+
+    while (remainingFailedPages.length > 0 && retryAttempts < maxRetries) {
+      retryAttempts++;
+      console.log(`Retry attempt ${retryAttempts} for ${remainingFailedPages.length} failed pages: ${remainingFailedPages.map(p => p.page_number).join(', ')}`);
+      
+      // Find the corresponding pages and retry them
+      const retryPages = pages.filter(p => remainingFailedPages.some(fp => fp.page_number === p.pageNumber));
+      
+      const retryPromises = retryPages.map(async (page) => {
+        console.log(`Retrying illustration for page ${page.pageNumber}...`);
+        
+        const imagePrompt = createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle?.style || 'cartoon');
+        
+        try {
+          // Add exponential backoff delay
+          const delay = Math.pow(2, retryAttempts - 1) * 1000; // 1s, 2s, 4s
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-image-1',
+              prompt: imagePrompt,
+              n: 1,
+              size: '1024x1024',
+              quality: 'medium',
+              output_format: 'png'
+            }),
+          });
+
+          if (!imageResponse.ok) {
+            const errorText = await imageResponse.text();
+            console.error(`Retry failed for page ${page.pageNumber}:`, imageResponse.status, errorText);
+            return { pageNumber: page.pageNumber, success: false, error: errorText };
+          }
+
+          const imageData = await imageResponse.json();
+          const base64Data = imageData.data[0].b64_json;
+          const imageUrl = `data:image/png;base64,${base64Data}`;
+
+          // Retry database update with timeout protection
+          let updateSuccess = false;
+          let updateAttempts = 0;
+          const maxUpdateAttempts = 3;
+          
+          while (!updateSuccess && updateAttempts < maxUpdateAttempts) {
+            updateAttempts++;
+            try {
+              const { error: updateError } = await supabase
+                .from('story_pages')
+                .update({ 
+                  image_url: imageUrl,
+                  image_prompt: imagePrompt
+                })
+                .eq('story_id', storyId)
+                .eq('page_number', page.pageNumber);
+
+              if (updateError) {
+                console.error(`Database update attempt ${updateAttempts} failed for page ${page.pageNumber}:`, updateError.message);
+                if (updateAttempts < maxUpdateAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+                }
+              } else {
+                updateSuccess = true;
+                console.log(`Page ${page.pageNumber} illustration retry successful`);
+              }
+            } catch (dbError) {
+              console.error(`Database error on attempt ${updateAttempts} for page ${page.pageNumber}:`, dbError);
+              if (updateAttempts < maxUpdateAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            }
+          }
+
+          return { pageNumber: page.pageNumber, success: updateSuccess, error: updateSuccess ? null : 'Database update failed' };
+        } catch (error) {
+          console.error(`Error retrying illustration for page ${page.pageNumber}:`, error);
+          return { pageNumber: page.pageNumber, success: false, error: error.message };
+        }
+      });
+
+      await Promise.allSettled(retryPromises);
+
+      // Check again for remaining failed pages
+      const { data: stillMissingPages } = await supabase
+        .from('story_pages')
+        .select('page_number')
+        .eq('story_id', storyId)
+        .is('image_url', null);
+
+      remainingFailedPages = stillMissingPages || [];
+      console.log(`After retry ${retryAttempts}: ${remainingFailedPages.length} pages still missing`);
+    }
+
     const totalPages = pages.length;
-    const failedPages = missingPages?.length || 0;
-    const successRate = ((totalPages - failedPages) / totalPages) * 100;
+    const finalFailedPages = remainingFailedPages.length;
+    const successRate = ((totalPages - finalFailedPages) / totalPages) * 100;
     
-    // Mark as completed if at least 75% of illustrations succeeded
-    if (successRate >= 75) {
+    // Only mark as completed if ALL images are generated (100% success rate)
+    if (finalFailedPages === 0) {
       await supabase
         .from('stories')
         .update({ status: 'completed' })
         .eq('id', storyId);
       
-      if (failedPages > 0) {
-        console.log(`Story ${storyId} completed with ${failedPages} failed illustrations (${successRate.toFixed(1)}% success rate)`);
-      } else {
-        console.log(`Story ${storyId} illustrations completed successfully`);
-      }
+      console.log(`Story ${storyId} illustrations completed successfully - all ${totalPages} pages have images`);
     } else {
-      // Mark as failed only if success rate is below 75%
+      // Mark as failed if any images are missing
       await supabase
         .from('stories')
         .update({ status: 'failed' })
         .eq('id', storyId);
-      console.warn(`Story ${storyId} marked as failed - only ${successRate.toFixed(1)}% success rate (${failedPages}/${totalPages} pages failed)`);
+      console.warn(`Story ${storyId} marked as failed - ${finalFailedPages} of ${totalPages} pages still missing images after ${retryAttempts} retry attempts`);
     }
 
   } catch (error) {
