@@ -396,6 +396,53 @@ const Library = () => {
 
         {/* Story Grid */}
         <section className="mb-16">
+          {/* Quick regeneration help */}
+          {stories.length > 0 && (
+            <div className="mb-8 max-w-4xl mx-auto">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <RefreshCw className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                      Your Story Images Need to be Regenerated
+                    </h3>
+                    <p className="text-blue-700 dark:text-blue-300 mb-4">
+                      The previous base64 images were cleared for better performance. Click below to regenerate images for all your stories.
+                    </p>
+                    <Button 
+                      onClick={async () => {
+                        if (!confirm('This will regenerate images for all your stories. This may take a few minutes. Continue?')) {
+                          return;
+                        }
+                        
+                        toast.info('Starting image regeneration...');
+                        
+                        for (const story of stories.filter(s => s.status === 'completed')) {
+                          try {
+                            await supabase.functions.invoke('regenerate-story-images', {
+                              body: { storyId: story.id }
+                            });
+                            toast.success(`Started regenerating images for "${story.title}"`);
+                          } catch (error) {
+                            console.error(`Failed to start regeneration for ${story.title}:`, error);
+                            toast.error(`Failed to start regeneration for "${story.title}"`);
+                          }
+                        }
+                        
+                        toast.info('Image regeneration started! This may take several minutes. You can refresh the page to see progress.');
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Regenerate All Story Images
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {filteredStories.length === 0 ? (
             <div className="max-w-2xl mx-auto">
