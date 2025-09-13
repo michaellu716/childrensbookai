@@ -62,10 +62,14 @@ export const StoryCard = ({ story, onLike, onTogglePublic, onDelete, isPublicVie
         
         {/* Cover Image */}
         <div className="aspect-[2/3] relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex flex-col items-center justify-center p-4 text-center">
-            <BookOpen className="h-8 w-8 text-primary/60 mb-3" />
-            <h3 className="font-bold text-sm leading-tight text-primary/80 line-clamp-2">{story.title}</h3>
-            <p className="text-xs text-primary/60 mt-2">Images being regenerated</p>
+          <img 
+            src="/src/assets/hero-image.jpg" 
+            alt={story.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-background/20 to-accent/30 flex flex-col items-center justify-center p-4 text-center">
+            <BookOpen className="h-8 w-8 text-white/80 mb-3 drop-shadow-lg" />
+            <h3 className="font-bold text-sm leading-tight text-white drop-shadow-lg line-clamp-2">{story.title}</h3>
           </div>
           
           {/* Overlay */}
