@@ -28,25 +28,17 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user from JWT
-    const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    
-    if (!token) {
-      throw new Error('No authentication token provided');
-    }
+    // Forward the client's auth so RLS applies correctly
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      throw new Error('Invalid authentication token');
-    }
-
-    // Verify story belongs to user
-    const { data: story, error: storyError } = await supabase
+    // Get story (RLS will ensure user can only access their own stories)
+    const { data: story, error: storyError } = await supabaseClient
       .from('stories')
       .select('*, character_sheets(*)')
       .eq('id', storyId)
-      .eq('user_id', user.id)
       .single();
 
     if (storyError || !story) {
@@ -54,7 +46,7 @@ serve(async (req) => {
     }
 
     // Get story pages that need illustrations
-    const { data: pages, error: pagesError } = await supabase
+    const { data: pages, error: pagesError } = await supabaseClient
       .from('story_pages')
       .select('*')
       .eq('story_id', storyId)

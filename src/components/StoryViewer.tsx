@@ -54,18 +54,32 @@ const StoryImage: React.FC<{
         <AlertCircle className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
         <span className="text-lg text-muted-foreground mb-6 font-serif">Image not available</span>
         {/* Show retry button for missing images */}
-        <Button 
-          variant="outline" 
-          onClick={() => {
-            // Get the story from the parent component
-            const event = new CustomEvent('retryStoryImages');
-            window.dispatchEvent(event);
-          }}
-          className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-amber-300 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-950/20 group"
-        >
-          <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
-          Retry Images
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              // Get the story from the parent component
+              const event = new CustomEvent('retryStoryImages');
+              window.dispatchEvent(event);
+            }}
+            className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-amber-300 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-950/20 group"
+          >
+            <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
+            Retry All
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              // Generate specific page image
+              const event = new CustomEvent('generatePageImage');
+              window.dispatchEvent(event);
+            }}
+            className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950/20 group"
+          >
+            <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
+            Fix This Page
+          </Button>
+        </div>
       </div>
     );
   }
@@ -165,9 +179,46 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
       }
     };
 
+    const handleGeneratePageImage = async () => {
+      if (!story || !pages[currentPage]) return;
+      
+      setRetryingIllustrations(true);
+      try {
+        const currentPageData = pages[currentPage];
+        console.log(`Generating image for page ${currentPageData.page_number}...`);
+        
+        const response = await supabase.functions.invoke('generate-page-image', {
+          body: { 
+            storyId: story.id,
+            pageNumber: currentPageData.page_number
+          }
+        });
+
+        if (response.error) {
+          console.error('Error generating page image:', response.error);
+          toast.error('Failed to generate page image');
+        } else {
+          console.log('Page image generation response:', response.data);
+          toast.success('Page image generated successfully!');
+          // Refetch story to get updated image
+          fetchStory();
+        }
+      } catch (err) {
+        console.error('Error calling generate-page-image function:', err);
+        toast.error('Failed to generate page image');
+      } finally {
+        setRetryingIllustrations(false);
+      }
+    };
+
     window.addEventListener('retryStoryImages', handleRetryImages);
-    return () => window.removeEventListener('retryStoryImages', handleRetryImages);
-  }, [story]);
+    window.addEventListener('generatePageImage', handleGeneratePageImage);
+    
+    return () => {
+      window.removeEventListener('retryStoryImages', handleRetryImages);
+      window.removeEventListener('generatePageImage', handleGeneratePageImage);
+    };
+  }, [story, pages, currentPage]);
 
   // Auto-play text when page changes
   useEffect(() => {
