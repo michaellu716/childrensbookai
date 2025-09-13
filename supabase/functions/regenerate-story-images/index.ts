@@ -145,29 +145,43 @@ async function regenerateImages(storyId: string, pages: any[], story: any, supab
 
       const imageData = await imageResponse.json();
       
-      // For gpt-image-1, the response format is different
-      let imageUrl;
-      if (imageData.data && imageData.data[0]) {
-        // gpt-image-1 returns base64 data directly
-        const base64Data = imageData.data[0].b64_json || imageData.data[0].url;
-        if (base64Data && base64Data.startsWith('data:')) {
-          imageUrl = base64Data;
-        } else if (base64Data) {
-          imageUrl = `data:image/png;base64,${base64Data}`;
-        } else {
-          throw new Error('No image data received');
-        }
-      } else {
-        throw new Error('Invalid response format from OpenAI');
+      // GPT-Image-1 returns base64 data directly
+      const base64Data = imageData.data[0].b64_json;
+      
+      // Convert base64 to binary data for storage
+      const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      
+      // Upload to Supabase Storage instead of storing as base64 in database
+      const fileName = `story-${storyId}/page-${page.page_number}-${Date.now()}.webp`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('story-images')
+        .upload(fileName, imageBuffer, {
+          contentType: 'image/webp',
+          cacheControl: '3600'
+        });
+
+      if (uploadError) {
+        console.error(`Failed to upload image to storage for page ${page.page_number}:`, uploadError);
+        results.push({ 
+          page: page.page_number, 
+          success: false, 
+          error: `Storage upload failed: ${uploadError.message}` 
+        });
+        continue;
       }
 
-      console.log(`Generated image for page ${page.page_number}, size: ${imageUrl.length} characters`);
+      // Get the public URL for the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from('story-images')
+        .getPublicUrl(fileName);
 
-      // Update the page with the new image
+      console.log(`Generated and uploaded image for page ${page.page_number} to: ${publicUrl}`);
+
+      // Update the page with the storage URL (much smaller than base64)
       const { error: updateError } = await supabase
         .from('story_pages')
         .update({ 
-          image_url: imageUrl,
+          image_url: publicUrl,
           image_prompt: imagePrompt
         })
         .eq('id', page.id);
