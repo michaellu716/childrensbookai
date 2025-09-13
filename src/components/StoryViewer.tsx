@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Download, Share2, Edit, Loader2, RefreshCw, 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
+import '../utils/regenerateMissingImage'; // Import utility for console access
 
 interface StoryPage {
   id: string;
