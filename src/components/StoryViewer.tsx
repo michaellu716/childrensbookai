@@ -736,76 +736,71 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
   const totalPages = pages.length + 1; // Add 1 for "The End" page
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-8">
       {/* Story Header */}
       <div className="text-center space-y-4">
-        <h1 className="text-4xl font-serif font-bold text-foreground tracking-wide">{story.title}</h1>
+        <h1 className="text-4xl font-bold text-foreground tracking-wide bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">{story.title}</h1>
         <div className="flex justify-center gap-3">
-          <Badge variant="secondary" className="px-3 py-1 rounded-full font-medium">{story.art_style}</Badge>
-          <Badge variant="secondary" className="px-3 py-1 rounded-full font-medium">{story.length} pages</Badge>
-          <Badge variant="secondary" className="px-3 py-1 rounded-full font-medium">Featuring {story.child_name}</Badge>
+          <Badge variant="secondary" className="px-4 py-2 rounded-full font-medium bg-gradient-to-r from-yellow-200 to-orange-200 text-orange-800 border-0">{story.art_style}</Badge>
+          <Badge variant="secondary" className="px-4 py-2 rounded-full font-medium bg-gradient-to-r from-green-200 to-emerald-200 text-emerald-800 border-0">{story.length} pages</Badge>
+          <Badge variant="secondary" className="px-4 py-2 rounded-full font-medium bg-gradient-to-r from-purple-200 to-pink-200 text-purple-800 border-0">Featuring {story.child_name}</Badge>
         </div>
       </div>
 
-      {/* Book Display */}
+      {/* Children's Book Display */}
       <div className="relative">
-        {/* Book Shadow and Base */}
-        <div className="absolute inset-x-4 bottom-0 h-8 bg-gradient-to-t from-black/20 to-transparent blur-xl rounded-full" />
+        {/* Book Shadow */}
+        <div className="absolute inset-x-6 bottom-2 h-6 bg-gradient-to-t from-black/15 to-transparent blur-2xl rounded-full" />
         
-        <div className="relative bg-gradient-to-br from-orange-100 via-amber-50 to-yellow-50 dark:from-amber-950/50 dark:via-orange-950/30 dark:to-yellow-950/50 rounded-2xl shadow-2xl border border-amber-200/50 dark:border-amber-800/30 overflow-hidden transform-gpu">
-          {/* Book Binding */}
-          <div className="absolute left-0 top-0 bottom-0 w-3 bg-gradient-to-b from-amber-800 via-orange-700 to-amber-900 shadow-inner" />
-          <div className="absolute left-3 top-0 bottom-0 w-px bg-amber-600/50" />
+        <div className="relative bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20 rounded-3xl shadow-2xl border-4 border-white dark:border-gray-700 overflow-hidden transform-gpu">
+          {/* Colorful Book Spine */}
+          <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-b from-red-400 via-orange-400 via-yellow-400 via-green-400 via-blue-400 via-indigo-400 to-purple-400 shadow-inner" />
+          <div className="absolute left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-red-300 to-purple-300 opacity-60" />
           
           {isEndPage ? (
             /* The End Page */
-            <div className="min-h-[600px] p-12 flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10">
-              <div className="text-center space-y-8">
-                <div className="text-8xl mb-6 animate-float">📚</div>
-                <h2 className="text-5xl font-serif font-bold text-primary mb-6 tracking-wide">The End</h2>
-                <p className="text-xl text-muted-foreground italic font-serif max-w-md mx-auto leading-relaxed">
+            <div className="min-h-[700px] p-16 flex items-center justify-center bg-gradient-to-br from-yellow-100 via-pink-100 to-purple-100 dark:from-yellow-900/20 dark:via-pink-900/20 dark:to-purple-900/20 relative">
+              <div className="text-center space-y-10">
+                <div className="text-9xl mb-8 animate-bounce">🎉</div>
+                <h2 className="text-6xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent mb-8 tracking-wide">The End</h2>
+                <p className="text-2xl text-gray-700 dark:text-gray-300 font-medium max-w-lg mx-auto leading-relaxed">
                   We hope you enjoyed {story.child_name}'s magical adventure!
                 </p>
-                <div className="mt-12 text-2xl text-amber-600 space-x-2">
-                  <span className="animate-pulse">⭐</span>
-                  <span className="animate-pulse animation-delay-200">⭐</span>
-                  <span className="animate-pulse animation-delay-400">⭐</span>
+                <div className="mt-16 text-4xl space-x-3">
+                  <span className="animate-pulse inline-block">🌟</span>
+                  <span className="animate-pulse inline-block animation-delay-200">✨</span>
+                  <span className="animate-pulse inline-block animation-delay-400">🌟</span>
                 </div>
               </div>
               
-              {/* Elegant Page Number */}
-              <div className="absolute top-8 right-8 text-sm text-muted-foreground font-serif">
-                Page {totalPages}
+              {/* Page Number Bottom Right */}
+              <div className="absolute bottom-6 right-8 text-lg font-bold text-purple-600 dark:text-purple-400 bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-lg border-2 border-purple-200 dark:border-purple-600">
+                {totalPages}
               </div>
             </div>
           ) : currentPageData ? (
-            <div className="min-h-[600px] flex flex-col lg:flex-row">
+            <div className="min-h-[700px] flex flex-col lg:flex-row relative">
               {/* Image Side */}
-              <div className="flex-1 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-950/20 dark:via-purple-950/20 dark:to-pink-950/20" />
-                <div className="relative h-full min-h-[300px] lg:min-h-[600px] p-6">
-                  <div className="h-full rounded-xl overflow-hidden shadow-lg border border-white/50 dark:border-white/10">
+              <div className="flex-1 relative bg-gradient-to-br from-sky-100 via-cyan-50 to-blue-100 dark:from-sky-900/20 dark:via-cyan-900/20 dark:to-blue-900/20">
+                <div className="relative h-full min-h-[350px] lg:min-h-[700px] p-8">
+                  <div className="h-full rounded-2xl overflow-hidden shadow-xl border-4 border-white dark:border-gray-600 bg-white dark:bg-gray-800">
                     <StoryImage
                       imageUrl={currentPageData.image_url}
                       alt={`Page ${currentPageData.page_number}`}
                     />
                   </div>
                 </div>
-                
-                {/* Page Number */}
-                <div className="absolute top-4 right-4 text-xs text-muted-foreground font-serif bg-white/80 dark:bg-black/60 px-2 py-1 rounded-lg backdrop-blur-sm">
-                  Page {currentPageData.page_number}
-                </div>
               </div>
               
               {/* Text Side */}
               {currentPageData.text_content && (
-                <div className="flex-1 relative bg-gradient-to-br from-cream-50 via-white to-cream-50 dark:from-gray-900/50 dark:via-gray-800/30 dark:to-gray-900/50">
-                  {/* Paper texture lines */}
-                  <div className="absolute inset-0 opacity-10 dark:opacity-5">
-                    {Array.from({ length: 20 }).map((_, i) => (
-                      <div key={i} className="h-px bg-blue-300 dark:bg-blue-600 mt-8 mx-6" />
-                    ))}
+                <div className="flex-1 relative bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20">
+                  {/* Decorative elements instead of lines */}
+                  <div className="absolute inset-0 opacity-20">
+                    <div className="absolute top-8 left-8 text-4xl text-pink-400">🌸</div>
+                    <div className="absolute top-20 right-12 text-3xl text-blue-400">⭐</div>
+                    <div className="absolute bottom-20 left-12 text-3xl text-green-400">🦋</div>
+                    <div className="absolute bottom-8 right-16 text-4xl text-purple-400">🌈</div>
                   </div>
                   
                   <div className="relative p-8 lg:p-12 h-full flex flex-col justify-center">
@@ -814,45 +809,45 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
                         <Textarea
                           value={editingText}
                           onChange={(e) => setEditingText(e.target.value)}
-                          className="min-h-[200px] text-lg font-serif bg-white/50 dark:bg-black/20 border-amber-200 dark:border-amber-800 rounded-xl resize-none focus:ring-2 focus:ring-amber-500/50"
+                          className="min-h-[200px] text-xl font-medium bg-white/80 dark:bg-gray-800/80 border-4 border-purple-200 dark:border-purple-600 rounded-2xl resize-none focus:ring-4 focus:ring-purple-300/50 dark:focus:ring-purple-500/50"
                           placeholder="Enter page text..."
                           maxLength={2000}
                           disabled={story?.status === 'generating'}
                         />
-                        <div className="flex justify-center gap-3">
+                        <div className="flex justify-center gap-4">
                           <Button 
                             onClick={savePageText} 
                             disabled={isSaving || editingText.trim() === currentPageData.text_content}
-                            className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            className="px-8 py-3 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 text-white transform hover:scale-105"
                           >
                             {isSaving ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              <Loader2 className="h-5 w-5 mr-3 animate-spin" />
                             ) : (
-                              <Save className="h-4 w-4 mr-2" />
+                              <Save className="h-5 w-5 mr-3" />
                             )}
                             Save Changes
                           </Button>
                           <Button 
                             variant="outline" 
                             onClick={cancelEditing}
-                            className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-amber-300 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-950/20"
+                            className="px-8 py-3 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-red-300 hover:bg-red-50 dark:border-red-600 dark:hover:bg-red-950/20 transform hover:scale-105"
                           >
-                            <X className="h-4 w-4 mr-2" />
+                            <X className="h-5 w-5 mr-3" />
                             Cancel
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground text-center font-serif">
+                        <p className="text-sm text-muted-foreground text-center font-medium">
                           {editingText.length}/2000 characters
                         </p>
                       </div>
                     ) : (
                       <div className="space-y-8">
-                        <p className="text-xl leading-relaxed font-serif text-gray-800 dark:text-gray-200 text-justify">
+                        <p className="text-2xl leading-relaxed font-medium text-gray-800 dark:text-gray-200 text-left bg-white/60 dark:bg-gray-800/60 p-6 rounded-2xl shadow-lg border-2 border-white dark:border-gray-600">
                           {currentPageData.text_content}
                         </p>
                         
-                        {/* Modern Action Buttons */}
-                        <div className="flex flex-wrap justify-center gap-3">
+                        {/* Playful Action Buttons */}
+                        <div className="flex flex-wrap justify-center gap-4">
                           {/* Text-to-Speech Controls */}
                           {ttsSupported && (
                             <>
@@ -860,36 +855,36 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
                                 <Button
                                   variant="outline"
                                   onClick={() => speak(currentPageData.text_content)}
-                                  className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950/20 group"
+                                  className="px-6 py-3 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-blue-300 hover:bg-blue-50 dark:border-blue-600 dark:hover:bg-blue-950/20 group transform hover:scale-105"
                                 >
-                                  <Play className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
+                                  <Play className="h-5 w-5 mr-3 group-hover:scale-110 transition-transform" />
                                   Read Aloud
                                 </Button>
                               ) : (
-                                <div className="flex gap-2">
+                                <div className="flex gap-3">
                                   {ttsPaused ? (
                                     <Button
                                       variant="outline"
                                       onClick={resume}
-                                      className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-green-300 hover:bg-green-50 dark:border-green-700 dark:hover:bg-green-950/20"
+                                      className="px-4 py-3 rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-green-300 hover:bg-green-50 dark:border-green-600 dark:hover:bg-green-950/20 transform hover:scale-105"
                                     >
-                                      <Play className="h-4 w-4" />
+                                      <Play className="h-5 w-5" />
                                     </Button>
                                   ) : (
                                     <Button
                                       variant="outline"
                                       onClick={pause}
-                                      className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-yellow-300 hover:bg-yellow-50 dark:border-yellow-700 dark:hover:bg-yellow-950/20"
+                                      className="px-4 py-3 rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-yellow-300 hover:bg-yellow-50 dark:border-yellow-600 dark:hover:bg-yellow-950/20 transform hover:scale-105"
                                     >
-                                      <Pause className="h-4 w-4" />
+                                      <Pause className="h-5 w-5" />
                                     </Button>
                                   )}
                                   <Button
                                     variant="outline"
                                     onClick={stop}
-                                    className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-red-300 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-950/20"
+                                    className="px-4 py-3 rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-red-300 hover:bg-red-50 dark:border-red-600 dark:hover:bg-red-950/20 transform hover:scale-105"
                                   >
-                                    <Square className="h-4 w-4" />
+                                    <Square className="h-5 w-5" />
                                   </Button>
                                 </div>
                               )}
@@ -902,9 +897,9 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
                               variant="outline"
                               onClick={() => startEditing(currentPageData.id, currentPageData.text_content)}
                               disabled={story?.status === 'generating'}
-                              className="px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-purple-300 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-950/20 group"
+                              className="px-6 py-3 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-purple-300 hover:bg-purple-50 dark:border-purple-600 dark:hover:bg-purple-950/20 group transform hover:scale-105"
                             >
-                              <Edit className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
+                              <Edit className="h-5 w-5 mr-3 group-hover:rotate-12 transition-transform" />
                               Edit Text
                             </Button>
                           )}
@@ -914,28 +909,33 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
                   </div>
                 </div>
               )}
+              
+              {/* Page Number Bottom Right */}
+              <div className="absolute bottom-6 right-8 text-lg font-bold text-purple-600 dark:text-purple-400 bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-lg border-2 border-purple-200 dark:border-purple-600">
+                {currentPageData.page_number}
+              </div>
             </div>
           ) : null}
         </div>
       </div>
 
-      {/* Modern Navigation */}
-      <div className="flex justify-between items-center px-4">
+      {/* Playful Navigation */}
+      <div className="flex justify-between items-center px-6">
         <Button
           onClick={prevPage}
           disabled={currentPage === 0}
-          className={`px-8 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${
+          className={`px-8 py-4 rounded-3xl font-bold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:-translate-y-2 ${
             currentPage === 0 
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none hover:shadow-none hover:translate-y-0' 
-              : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white'
+              : 'bg-gradient-to-r from-pink-400 via-purple-500 to-indigo-500 hover:from-pink-500 hover:via-purple-600 hover:to-indigo-600 text-white'
           }`}
         >
-          <ChevronLeft className="h-5 w-5 mr-2" />
+          <ChevronLeft className="h-6 w-6 mr-3" />
           Previous Page
         </Button>
         
-        {/* Elegant Page Indicators */}
-        <div className="flex gap-3 px-6 py-2 bg-white/60 dark:bg-black/20 rounded-2xl backdrop-blur-sm border border-white/20 dark:border-white/10">
+        {/* Colorful Page Indicators */}
+        <div className="flex gap-4 px-8 py-3 bg-gradient-to-r from-yellow-100 via-pink-100 to-purple-100 dark:from-yellow-900/20 dark:via-pink-900/20 dark:to-purple-900/20 rounded-3xl backdrop-blur-sm border-4 border-white dark:border-gray-600 shadow-xl">
           {Array.from({ length: totalPages }).map((_, index) => (
             <button
               key={index}
@@ -943,14 +943,14 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
                 setCurrentPage(index);
                 setHasUserNavigated(true);
               }}
-              className={`relative w-4 h-4 rounded-full transition-all duration-300 hover:scale-125 ${
+              className={`relative w-5 h-5 rounded-full transition-all duration-300 hover:scale-150 transform ${
                 index === currentPage
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg'
-                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-amber-300 dark:hover:bg-amber-700'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 shadow-2xl scale-125'
+                  : 'bg-gradient-to-r from-blue-300 to-green-300 hover:from-purple-300 hover:to-pink-300 shadow-lg'
               }`}
             >
               {index === currentPage && (
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 animate-pulse opacity-50" />
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 animate-ping opacity-75 scale-150" />
               )}
             </button>
           ))}
@@ -959,37 +959,37 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
         <Button
           onClick={nextPage}
           disabled={currentPage === totalPages - 1}
-          className={`px-8 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${
+          className={`px-8 py-4 rounded-3xl font-bold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:-translate-y-2 ${
             currentPage === totalPages - 1
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none hover:shadow-none hover:translate-y-0'
-              : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white'
+              : 'bg-gradient-to-r from-green-400 via-blue-500 to-purple-500 hover:from-green-500 hover:via-blue-600 hover:to-purple-600 text-white'
           }`}
         >
           Next Page
-          <ChevronRight className="h-5 w-5 ml-2" />
+          <ChevronRight className="h-6 w-6 ml-3" />
         </Button>
       </div>
 
-      {/* Modern Action Buttons - Only show for authenticated users */}
+      {/* Colorful Action Buttons - Only show for authenticated users */}
       {!isPublicView && (
-        <div className="flex justify-center gap-6 pt-4">
+        <div className="flex justify-center gap-8 pt-6">
           <Button 
             onClick={handleDownloadPDF} 
             disabled={isDownloadingPDF}
-            className="px-8 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white group"
+            className="px-10 py-4 rounded-3xl font-bold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-r from-orange-400 via-pink-500 to-red-500 hover:from-orange-500 hover:via-pink-600 hover:to-red-600 text-white group"
           >
             {isDownloadingPDF ? (
-              <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+              <Loader2 className="h-6 w-6 mr-3 animate-spin" />
             ) : (
-              <Download className="h-5 w-5 mr-3 group-hover:scale-110 transition-transform" />
+              <Download className="h-6 w-6 mr-3 group-hover:scale-110 transition-transform" />
             )}
             Download as PDF
           </Button>
           <Button 
             onClick={handleShare}
-            className="px-8 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white group"
+            className="px-10 py-4 rounded-3xl font-bold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 hover:from-blue-500 hover:via-purple-600 hover:to-pink-600 text-white group"
           >
-            <Share2 className="h-5 w-5 mr-3 group-hover:scale-110 transition-transform" />
+            <Share2 className="h-6 w-6 mr-3 group-hover:scale-110 transition-transform" />
             Share Story
           </Button>
         </div>
