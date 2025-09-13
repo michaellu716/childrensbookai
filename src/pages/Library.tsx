@@ -452,7 +452,7 @@ const Library = () => {
               {/* Story Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                 {paginatedStories.map((story) => (
-                  <StoryCard key={story.id} story={story} onLike={handleLike} onTogglePublic={handleTogglePublic} />
+                  <StoryCard key={story.id} story={story} onLike={handleLike} onTogglePublic={handleTogglePublic} onDelete={handleDelete} />
                 ))}
               </div>
 

@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Star, Globe, Lock } from "lucide-react";
+import { BookOpen, Star, Globe, Lock, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LazyImage } from "./LazyImage";
 import { useStoryImageQuery } from "@/hooks/useStoriesQuery";
@@ -26,10 +26,11 @@ interface StoryCardProps {
   story: Story;
   onLike: (storyId: string) => void;
   onTogglePublic?: (storyId: string, isPublic: boolean) => void;
+  onDelete?: (storyId: string, storyTitle: string) => void;
   isPublicView?: boolean;
 }
 
-export const StoryCard = ({ story, onLike, onTogglePublic, isPublicView = false }: StoryCardProps) => {
+export const StoryCard = ({ story, onLike, onTogglePublic, onDelete, isPublicView = false }: StoryCardProps) => {
   const navigate = useNavigate();
   
   // Use lazy loading for images if not already loaded
@@ -125,6 +126,21 @@ export const StoryCard = ({ story, onLike, onTogglePublic, isPublicView = false 
               className="absolute bottom-2 left-2 z-10 text-white hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 h-7 w-7 p-0"
             >
               {story.is_public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+            </Button>
+          )}
+
+          {/* Delete Button - Only show for authenticated users */}
+          {onDelete && !isPublicView && (
+            <Button 
+              size="sm" 
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(story.id, story.title);
+              }}
+              className="absolute bottom-2 right-2 z-10 text-white hover:text-red-400 hover:bg-black/20 backdrop-blur-sm bg-black/10 border border-white/20 h-7 w-7 p-0"
+            >
+              <Trash2 className="h-3 w-3" />
             </Button>
           )}
         </div>
