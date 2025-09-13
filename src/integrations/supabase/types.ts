@@ -210,6 +210,7 @@ export type Database = {
           id: string
           image_prompt: string | null
           image_url: string | null
+          needs_base64_conversion: boolean | null
           page_number: number
           page_type: string | null
           story_id: string
@@ -221,6 +222,7 @@ export type Database = {
           id?: string
           image_prompt?: string | null
           image_url?: string | null
+          needs_base64_conversion?: boolean | null
           page_number: number
           page_type?: string | null
           story_id: string
@@ -232,6 +234,7 @@ export type Database = {
           id?: string
           image_prompt?: string | null
           image_url?: string | null
+          needs_base64_conversion?: boolean | null
           page_number?: number
           page_type?: string | null
           story_id?: string

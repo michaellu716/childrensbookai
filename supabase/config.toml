@@ -11,3 +11,21 @@ verify_jwt = true
 
 [functions.generate-story-pdf]
 verify_jwt = true
+
+[functions.generate-page-image]
+verify_jwt = true
+
+[functions.get-page-image]
+verify_jwt = false
+
+[functions.reconnect-existing-images]
+verify_jwt = true
+
+[functions.regenerate-story-images]
+verify_jwt = true
+
+[functions.retry-story-illustrations]
+verify_jwt = true
+
+[functions.convert-storage-to-base64]
+verify_jwt = true
