@@ -48,19 +48,40 @@ export const useStoryImageQuery = (storyId: string, enabled: boolean = true) => 
   return useQuery({
     queryKey: ['story-image', storyId],
     queryFn: async () => {
-      const { data: firstPage, error } = await supabase
-        .from('story_pages')
-        .select('image_url')
-        .eq('story_id', storyId)
-        .eq('page_number', 1)
-        .maybeSingle();
-      
-      if (error) {
-        console.warn('Failed to get story image:', error);
+      try {
+        // First try to get the page with image_url
+        const { data: firstPage, error } = await supabase
+          .from('story_pages')
+          .select('image_url, id')
+          .eq('story_id', storyId)
+          .eq('page_number', 1)
+          .maybeSingle();
+        
+        if (error) {
+          console.warn('Failed to get story image:', error);
+          
+          // If RLS is blocking, try using the edge function approach
+          if (error.code === 'PGRST301' || error.message?.includes('permission')) {
+            console.log('Trying edge function approach for story:', storyId);
+            
+            // Get the page ID first using a different approach
+            const { data: pageData } = await supabase.functions.invoke('get-story-details', {
+              body: { storyId }
+            });
+            
+            if (pageData?.pages?.[0]?.image_url) {
+              return pageData.pages[0].image_url;
+            }
+          }
+          
+          return null;
+        }
+        
+        return firstPage?.image_url || null;
+      } catch (err) {
+        console.error('Error in useStoryImageQuery:', err);
         return null;
       }
-      
-      return firstPage?.image_url || null;
     },
     enabled,
     staleTime: 60 * 60 * 1000, // 1 hour - longer cache for images
