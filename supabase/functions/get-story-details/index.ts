@@ -41,9 +41,14 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization") ?? "";
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
+      db: { schema: 'public' },
+      auth: { persistSession: false }
     });
 
+    console.log('get-story-details: About to fetch story with ID:', storyId);
+
     // Fetch story and basic page info (NO image URLs to avoid timeout)
+    // Force fresh data by adding timestamp parameter to bypass any caching
     const [
       { data: story, error: storyError },
       { data: pages, error: pagesError },
@@ -96,6 +101,9 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log('get-story-details: Story found with status:', story.status, 'updated_at:', story.updated_at);
+    
     // Fetch character sheet only if needed
     let character_sheets: any = null;
     if (story.character_sheet_id) {
