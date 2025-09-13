@@ -41,45 +41,14 @@ interface StoryViewerProps {
   isPublicView?: boolean;
 }
 
-// Lazy loading image component
-const LazyImage: React.FC<{ 
-  pageId: string; 
-  loadImage: (pageId: string) => Promise<string | null>; 
-  isLoading: boolean;
+// Simple image component that uses the URL directly from story data
+const StoryImage: React.FC<{ 
+  imageUrl?: string | null; 
   alt?: string;
-}> = ({ pageId, loadImage, isLoading, alt = "Story page" }) => {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [imageLoading, setImageLoading] = useState(false);
+}> = ({ imageUrl, alt = "Story page" }) => {
   const [imageError, setImageError] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      setImageLoading(true);
-      setImageError(false);
-      try {
-        const url = await loadImage(pageId);
-        setImageUrl(url);
-        if (!url) setImageError(true);
-      } catch (error) {
-        console.error('Error loading image:', error);
-        setImageError(true);
-      } finally {
-        setImageLoading(false);
-      }
-    };
-
-    load();
-  }, [pageId, loadImage]);
-
-  if (imageLoading || isLoading) {
-    return (
-      <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (imageError || !imageUrl) {
+  if (!imageUrl || imageError) {
     return (
       <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center">
         <AlertCircle className="h-8 w-8 text-muted-foreground" />
@@ -113,9 +82,6 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
   const [editingText, setEditingText] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   
-  // Image loading state
-  const [imageCache, setImageCache] = useState<Record<string, string>>({});
-  const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
   
   // Text-to-speech with auto-advance callback
   const { speak, stop, pause, resume, isSupported: ttsSupported, isPlaying: ttsPlaying, isPaused: ttsPaused, voices } = useTextToSpeech({
@@ -490,42 +456,6 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
     }
   };
 
-  // Lazy load image for a specific page
-  const loadPageImage = async (pageId: string) => {
-    // Check if already cached or loading
-    if (imageCache[pageId] || loadingImages.has(pageId)) {
-      return imageCache[pageId] || null;
-    }
-
-    setLoadingImages(prev => new Set(prev).add(pageId));
-
-    try {
-      const { data, error } = await supabase.functions.invoke('get-page-image', {
-        body: { pageId }
-      });
-
-      if (error) {
-        console.warn('Error loading page image:', error);
-        return null;
-      }
-
-      const imageUrl = data?.image_url;
-      if (imageUrl) {
-        setImageCache(prev => ({ ...prev, [pageId]: imageUrl }));
-        return imageUrl;
-      }
-      return null;
-    } catch (error) {
-      console.warn('Failed to load page image:', error);
-      return null;
-    } finally {
-      setLoadingImages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(pageId);
-        return newSet;
-      });
-    }
-  };
 
   const startEditing = (pageId: string, currentText: string | null | undefined) => {
     console.log('[StoryViewer] Start editing page', { pageId });
@@ -786,10 +716,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
       ) : currentPageData ? (
         <Card className="overflow-hidden animate-fade-in">
           <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-secondary/10 relative mb-0 animate-scale-in">
-            <LazyImage
-              pageId={currentPageData.id}
-              loadImage={loadPageImage}
-              isLoading={loadingImages.has(currentPageData.id)}
+            <StoryImage
+              imageUrl={currentPageData.image_url}
               alt={`Page ${currentPageData.page_number}`}
             />
             
