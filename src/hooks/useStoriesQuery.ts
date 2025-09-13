@@ -48,6 +48,8 @@ export const useStoryImageQuery = (storyId: string, enabled: boolean = true) => 
   return useQuery({
     queryKey: ['story-image', storyId],
     queryFn: async () => {
+      console.log('🖼️ Fetching image for story:', storyId);
+      
       try {
         // First try to get the page with image_url
         const { data: firstPage, error } = await supabase
@@ -57,29 +59,42 @@ export const useStoryImageQuery = (storyId: string, enabled: boolean = true) => 
           .eq('page_number', 1)
           .maybeSingle();
         
+        console.log('📊 Direct query result:', { firstPage, error });
+        
         if (error) {
-          console.warn('Failed to get story image:', error);
+          console.warn('❌ Failed to get story image:', error);
           
-          // If RLS is blocking, try using the edge function approach
-          if (error.code === 'PGRST301' || error.message?.includes('permission')) {
-            console.log('Trying edge function approach for story:', storyId);
-            
-            // Get the page ID first using a different approach
-            const { data: pageData } = await supabase.functions.invoke('get-story-details', {
+          // Try using the edge function approach as fallback
+          console.log('🔄 Trying edge function approach for story:', storyId);
+          
+          try {
+            const { data: pageData, error: edgeError } = await supabase.functions.invoke('get-story-details', {
               body: { storyId }
             });
             
+            console.log('🌐 Edge function result:', { pageData, edgeError });
+            
+            if (edgeError) {
+              console.error('❌ Edge function error:', edgeError);
+              return null;
+            }
+            
             if (pageData?.pages?.[0]?.image_url) {
+              console.log('✅ Found image via edge function:', pageData.pages[0].image_url);
               return pageData.pages[0].image_url;
             }
+          } catch (edgeErr) {
+            console.error('❌ Edge function failed:', edgeErr);
           }
           
           return null;
         }
         
-        return firstPage?.image_url || null;
+        const imageUrl = firstPage?.image_url || null;
+        console.log('✅ Direct query image result:', imageUrl);
+        return imageUrl;
       } catch (err) {
-        console.error('Error in useStoryImageQuery:', err);
+        console.error('❌ Error in useStoryImageQuery:', err);
         return null;
       }
     },
