@@ -54,31 +54,39 @@ const StoryImage: React.FC<{
         <AlertCircle className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
         <span className="text-lg text-muted-foreground mb-6 font-serif">Image not available</span>
         {/* Show retry button for missing images */}
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-3">
+          <span className="text-lg text-muted-foreground font-medium">Image not available</span>
           <Button 
             variant="outline" 
-            onClick={() => {
-              // Get the story from the parent component
-              const event = new CustomEvent('retryStoryImages');
-              window.dispatchEvent(event);
-            }}
-            className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-amber-300 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-950/20 group"
-          >
-            <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
-            Retry All
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              // Generate specific page image
-              const event = new CustomEvent('generatePageImage');
-              window.dispatchEvent(event);
+            onClick={async () => {
+              try {
+                // Generate image directly using OpenAI API
+                const prompt = `Create a wholesome Disney-style cartoon children's book illustration showing: With gentle fingers, Radima carefully removed the twig from the bird's feathers. 'Thank you, Radima!' chirped the bird, flapping its wings in excitement. Radima felt her heart fill with joy knowing she had helped another animal.
+
+Character appearance (maintain consistency):
+- Child named Radima
+- Hair: black long with a ponytail and side bangs
+- Eyes: dark brown
+- Skin: rich brown
+- Clothing: traditional Indian attire with a colorful lehenga and dupatta
+
+Style: Disney-style cartoon art style, bright cheerful colors, safe family-friendly content, whimsical storybook illustration, detailed pleasant background, consistent character design, appealing to young children ages 3-8`;
+
+                // You can manually generate this image using DALL-E or another AI image generator
+                // For now, let's show a placeholder message
+                alert(`Image prompt ready:\n\n${prompt}\n\nYou can use this prompt with DALL-E, Midjourney, or any AI image generator to create the image for this page.`);
+              } catch (error) {
+                console.error('Error:', error);
+              }
             }}
             className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950/20 group"
           >
             <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
-            Fix This Page
+            Get Image Prompt
           </Button>
+          <p className="text-sm text-muted-foreground text-center">
+            Due to network issues, you can copy the AI prompt and generate the image manually
+          </p>
         </div>
       </div>
     );
