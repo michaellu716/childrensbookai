@@ -120,55 +120,114 @@ async function generateStoryIllustrations(
       .eq('generation_type', 'illustrations')
       .eq('status', 'pending');
 
-    for (const page of pages) {
+    // Process pages with staggered timing to avoid rate limits
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
       console.log(`Generating illustration for page ${page.page_number}...`);
+      
+      // Add staggered delay to avoid rate limiting
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 15000)); // 15 second delay between requests
+      }
       
       const imagePrompt = createImagePrompt(page.image_prompt || `${selectedAvatarStyle?.style || 'cartoon'} illustration: ${page.text_content}`, characterSheet, selectedAvatarStyle?.style || 'cartoon');
       
-      const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'dall-e-3',
-          prompt: imagePrompt,
-          n: 1,
-          size: '1024x1024',
-          quality: 'standard',
-          response_format: 'b64_json'
-        }),
-      });
-
-      if (!imageResponse.ok) {
-        const errorText = await imageResponse.text();
-        console.error(`Failed to generate image for page ${page.page_number}:`, imageResponse.status, errorText);
-        continue;
-      }
-
-      const imageData = await imageResponse.json();
-      console.log(`Image response for page ${page.page_number}:`, JSON.stringify(imageData).substring(0, 200));
+      let attempts = 0;
+      let success = false;
+      const maxAttempts = 3;
       
-      // DALL-E-3 returns base64 in b64_json format
-      const base64Data = imageData.data[0].b64_json;
-      const imageUrl = `data:image/png;base64,${base64Data}`;
-      console.log(`Generated image URL length for page ${page.page_number}:`, imageUrl.length);
+      while (attempts < maxAttempts && !success) {
+        attempts++;
+        
+        try {
+          // Use progressively safer prompts on retries
+          const finalPrompt = attempts > 1 ? createSaferImagePrompt(page.text_content, characterSheet, selectedAvatarStyle?.style || 'cartoon') : imagePrompt;
+          
+          const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-image-1', // Use faster, more reliable model
+              prompt: finalPrompt,
+              n: 1,
+              size: '1024x1024',
+              quality: 'medium',
+              output_format: 'png'
+            }),
+          });
 
-      // Update story page with generated image
-      const { error: updateError } = await supabase
-        .from('story_pages')
-        .update({ 
-          image_url: imageUrl,
-          image_prompt: imagePrompt
-        })
-        .eq('story_id', storyId)
-        .eq('page_number', page.page_number);
+          if (!imageResponse.ok) {
+            const errorText = await imageResponse.text();
+            console.error(`Failed to generate image for page ${page.page_number} (attempt ${attempts}):`, imageResponse.status, errorText);
+            
+            if (attempts < maxAttempts) {
+              // Wait longer between retries, especially for rate limits
+              const retryDelay = imageResponse.status === 429 ? 30000 : 10000; // 30s for rate limits, 10s for others
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+            continue;
+          }
 
-      if (updateError) {
-        console.error(`Failed to update page ${page.page_number}:`, updateError.message);
-      } else {
-        console.log(`Page ${page.page_number} illustration completed`);
+          const imageData = await imageResponse.json();
+          console.log(`Image response for page ${page.page_number}:`, JSON.stringify(imageData).substring(0, 200));
+          
+          // gpt-image-1 returns base64 directly
+          const base64Data = imageData.data[0].b64_json;
+          const imageUrl = `data:image/png;base64,${base64Data}`;
+          console.log(`Generated image URL length for page ${page.page_number}:`, imageUrl.length);
+
+          // Retry database updates with better error handling
+          let updateAttempts = 0;
+          let updateSuccess = false;
+          
+          while (updateAttempts < 3 && !updateSuccess) {
+            updateAttempts++;
+            
+            try {
+              const { error: updateError } = await supabase
+                .from('story_pages')
+                .update({ 
+                  image_url: imageUrl,
+                  image_prompt: finalPrompt
+                })
+                .eq('story_id', storyId)
+                .eq('page_number', page.page_number);
+
+              if (updateError) {
+                console.error(`Database update attempt ${updateAttempts} failed for page ${page.page_number}:`, updateError.message);
+                if (updateAttempts < 3) {
+                  await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s before retry
+                }
+              } else {
+                updateSuccess = true;
+                success = true;
+                console.log(`Page ${page.page_number} illustration completed`);
+              }
+            } catch (dbError) {
+              console.error(`Database error on update attempt ${updateAttempts} for page ${page.page_number}:`, dbError);
+              if (updateAttempts < 3) {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+              }
+            }
+          }
+          
+          if (!updateSuccess) {
+            console.error(`Failed to save image for page ${page.page_number} after all database retry attempts`);
+          }
+          
+        } catch (error) {
+          console.error(`Error generating illustration for page ${page.page_number} (attempt ${attempts}):`, error);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 10000)); // 10s delay before retry
+          }
+        }
+      }
+      
+      if (!success) {
+        console.error(`Failed to generate image for page ${page.page_number} after ${maxAttempts} attempts`);
       }
     }
 
@@ -260,6 +319,25 @@ async function generateStoryIllustrations(
       console.error('Failed to update story status to failed:', dbError);
     }
   }
+}
+
+function createSaferImagePrompt(sceneDescription: string, characterSheet: any, artStyle: string): string {
+  // More aggressive sanitization for retry attempts
+  const verySecureDescription = sceneDescription
+    .replace(/\b(fight|battle|violence|scary|dangerous|weapon|hurt|pain|fear|afraid|terror|nightmare)\b/gi, 'play')
+    .replace(/\b(dark|darkness|shadow|gloomy|night|black)\b/gi, 'bright')
+    .replace(/\b(monster|beast|creature|dragon|witch|ghost)\b/gi, 'friendly animal')
+    .replace(/\b(lost|alone|sad|crying|worried|anxious)\b/gi, 'happy')
+    .replace(/\b(fire|flame|burn|smoke)\b/gi, 'sparkles')
+    .replace(/\b(storm|rain|thunder|lightning)\b/gi, 'sunshine');
+
+  if (!characterSheet) {
+    return `A simple ${artStyle} children's book illustration: ${verySecureDescription}. Happy, colorful, safe content for young children. Bright cartoon style with cheerful colors.`;
+  }
+
+  return `A simple ${artStyle} children's book illustration: ${verySecureDescription}. 
+Main character: child with ${characterSheet.hair_color} hair, ${characterSheet.eye_color} eyes, ${characterSheet.skin_tone} skin.
+Happy, colorful, safe content for young children. Bright cartoon style with cheerful colors.`;
 }
 
 function createImagePrompt(sceneDescription: string, characterSheet: any, artStyle: string): string {

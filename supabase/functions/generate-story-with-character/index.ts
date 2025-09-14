@@ -306,6 +306,10 @@ async function generateStoryIllustrations(
       const imagePrompt = createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle?.style || 'cartoon');
       
       try {
+        // Add rate limiting delay - stagger requests to avoid hitting limits
+        const delay = (page.pageNumber - 1) * 2000; // 2 second stagger between requests
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
         const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: {
@@ -313,7 +317,7 @@ async function generateStoryIllustrations(
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-image-1',  // Faster than dall-e-3
+            model: 'gpt-image-1',
             prompt: imagePrompt,
             n: 1,
             size: '1024x1024',
@@ -325,7 +329,15 @@ async function generateStoryIllustrations(
         if (!imageResponse.ok) {
           const errorText = await imageResponse.text();
           console.error(`Failed to generate image for page ${page.pageNumber}:`, imageResponse.status, errorText);
-          return { pageNumber: page.pageNumber, success: false, error: errorText };
+          
+          // Handle specific error types
+          if (imageResponse.status === 429) {
+            return { pageNumber: page.pageNumber, success: false, error: 'rate_limit', details: errorText };
+          } else if (imageResponse.status === 400 && errorText.includes('content_policy_violation')) {
+            return { pageNumber: page.pageNumber, success: false, error: 'content_policy', details: errorText };
+          }
+          
+          return { pageNumber: page.pageNumber, success: false, error: 'generation_failed', details: errorText };
         }
 
         const imageData = await imageResponse.json();
@@ -397,9 +409,21 @@ async function generateStoryIllustrations(
         const imagePrompt = createImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle?.style || 'cartoon');
         
         try {
-          // Add exponential backoff delay
-          const delay = Math.pow(2, retryAttempts - 1) * 1000; // 1s, 2s, 4s
-          await new Promise(resolve => setTimeout(resolve, delay));
+          // Smart retry delays based on error type and attempt number
+          let retryDelay = Math.pow(2, retryAttempts - 1) * 2000; // 2s, 4s, 8s base delay
+          
+          // Add extra delay for rate limiting
+          if (retryAttempts > 1) {
+            retryDelay += 15000; // Additional 15 seconds for rate limits
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          
+          // Try to create a safer prompt for content policy issues
+          let finalPrompt = imagePrompt;
+          if (retryAttempts > 1) {
+            finalPrompt = createSaferImagePrompt(page.sceneDescription, characterSheet, selectedAvatarStyle?.style || 'cartoon');
+          }
           
           const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
             method: 'POST',
@@ -409,7 +433,7 @@ async function generateStoryIllustrations(
             },
             body: JSON.stringify({
               model: 'gpt-image-1',
-              prompt: imagePrompt,
+              prompt: finalPrompt,
               n: 1,
               size: '1024x1024',
               quality: 'medium',
@@ -420,6 +444,14 @@ async function generateStoryIllustrations(
           if (!imageResponse.ok) {
             const errorText = await imageResponse.text();
             console.error(`Retry failed for page ${page.pageNumber}:`, imageResponse.status, errorText);
+            
+            // Log specific error types for better debugging
+            if (imageResponse.status === 429) {
+              console.error(`Rate limit hit on retry ${retryAttempts} for page ${page.pageNumber}`);
+            } else if (imageResponse.status === 400) {
+              console.error(`Content policy violation on retry ${retryAttempts} for page ${page.pageNumber}`);
+            }
+            
             return { pageNumber: page.pageNumber, success: false, error: errorText };
           }
 
@@ -532,6 +564,25 @@ async function generateStoryIllustrations(
       console.error('Failed to update story status to failed:', dbError);
     }
   }
+}
+
+function createSaferImagePrompt(sceneDescription: string, characterSheet: any, artStyle: string): string {
+  // More aggressive sanitization for retry attempts
+  const verySecureDescription = sceneDescription
+    .replace(/\b(fight|battle|violence|scary|dangerous|weapon|hurt|pain|fear|afraid|terror|nightmare)\b/gi, 'play')
+    .replace(/\b(dark|darkness|shadow|gloomy|night|black)\b/gi, 'bright')
+    .replace(/\b(monster|beast|creature|dragon|witch|ghost)\b/gi, 'friendly animal')
+    .replace(/\b(lost|alone|sad|crying|worried|anxious)\b/gi, 'happy')
+    .replace(/\b(fire|flame|burn|smoke)\b/gi, 'sparkles')
+    .replace(/\b(storm|rain|thunder|lightning)\b/gi, 'sunshine');
+
+  if (!characterSheet) {
+    return `A simple ${artStyle} children's book illustration: ${verySecureDescription}. Happy, colorful, safe content for young children. Bright cartoon style with cheerful colors.`;
+  }
+
+  return `A simple ${artStyle} children's book illustration: ${verySecureDescription}. 
+Main character: child with ${characterSheet.hair_color} hair, ${characterSheet.eye_color} eyes, ${characterSheet.skin_tone} skin.
+Happy, colorful, safe content for young children. Bright cartoon style with cheerful colors.`;
 }
 
 function createImagePrompt(sceneDescription: string, characterSheet: any, artStyle: string): string {

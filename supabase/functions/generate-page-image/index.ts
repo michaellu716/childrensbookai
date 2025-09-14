@@ -85,41 +85,83 @@ serve(async (req) => {
     
     console.log('Generated prompt:', imagePrompt);
 
-    // Generate image using OpenAI
-    const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: imagePrompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'high',
-        output_format: 'webp'
-      }),
-    });
+    // Generate image using OpenAI with retry logic
+    let imageResponse;
+    let imageData;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      attempts++;
+      
+      try {
+        // Add delay for rate limiting
+        if (attempts > 1) {
+          const delay = Math.pow(2, attempts - 1) * 5000; // 5s, 10s delays
+          console.log(`Attempt ${attempts}: waiting ${delay}ms before retry`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        
+        // Use safer prompt on retries
+        const finalPrompt = attempts > 1 ? createSaferImagePrompt(sceneDescription, story.character_sheets, story.art_style) : imagePrompt;
+        
+        imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-image-1',
+            prompt: finalPrompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'medium', // Use medium for better reliability
+            output_format: 'png'
+          }),
+        });
 
-    if (!imageResponse.ok) {
-      const errorText = await imageResponse.text();
-      console.error(`Failed to generate image:`, imageResponse.status, errorText);
-      return new Response(JSON.stringify({ 
-        error: "Failed to generate image", 
-        details: errorText 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        if (imageResponse.ok) {
+          imageData = await imageResponse.json();
+          break; // Success, exit retry loop
+        }
+        
+        const errorText = await imageResponse.text();
+        console.error(`Attempt ${attempts} failed:`, imageResponse.status, errorText);
+        
+        // Don't retry on content policy violations with same prompt
+        if (imageResponse.status === 400 && errorText.includes('content_policy_violation') && attempts === 1) {
+          console.log('Content policy violation detected, will try safer prompt on next attempt');
+        } else if (attempts === maxAttempts) {
+          return new Response(JSON.stringify({ 
+            error: "Failed to generate image after multiple attempts", 
+            details: errorText 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+      } catch (fetchError) {
+        console.error(`Network error on attempt ${attempts}:`, fetchError);
+        if (attempts === maxAttempts) {
+          return new Response(JSON.stringify({ 
+            error: "Network error during image generation", 
+            details: fetchError.message 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
     }
 
-    const imageData = await imageResponse.json();
+    // imageData is already set in the retry loop above
     console.log(`Image generated successfully for page ${pageNumber}`);
     
     // GPT-Image-1 returns base64 data directly
     const base64Data = imageData.data[0].b64_json;
-    const imageUrl = `data:image/webp;base64,${base64Data}`;
+    const imageUrl = `data:image/png;base64,${base64Data}`;
     
     console.log(`Image generated successfully for page ${pageNumber}, storing as base64`);
 
@@ -166,6 +208,25 @@ serve(async (req) => {
     });
   }
 });
+
+function createSaferImagePrompt(sceneDescription: string, characterSheet: any, artStyle: string): string {
+  // More aggressive sanitization for retry attempts
+  const verySecureDescription = sceneDescription
+    .replace(/\b(fight|battle|violence|scary|dangerous|weapon|hurt|pain|fear|afraid|terror|nightmare)\b/gi, 'play')
+    .replace(/\b(dark|darkness|shadow|gloomy|night|black)\b/gi, 'bright')
+    .replace(/\b(monster|beast|creature|dragon|witch|ghost)\b/gi, 'friendly animal')
+    .replace(/\b(lost|alone|sad|crying|worried|anxious)\b/gi, 'happy')
+    .replace(/\b(fire|flame|burn|smoke)\b/gi, 'sparkles')
+    .replace(/\b(storm|rain|thunder|lightning)\b/gi, 'sunshine');
+
+  if (!characterSheet) {
+    return `A simple ${artStyle} children's book illustration: ${verySecureDescription}. Happy, colorful, safe content for young children. Bright cartoon style with cheerful colors.`;
+  }
+
+  return `A simple ${artStyle} children's book illustration: ${verySecureDescription}. 
+Main character: child with ${characterSheet.hair_color} hair, ${characterSheet.eye_color} eyes, ${characterSheet.skin_tone} skin.
+Happy, colorful, safe content for young children. Bright cartoon style with cheerful colors.`;
+}
 
 function createImagePrompt(sceneDescription: string, characterSheet: any, artStyle: string): string {
   // Sanitize scene description to avoid safety system triggers
