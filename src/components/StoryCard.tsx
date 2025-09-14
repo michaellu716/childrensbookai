@@ -150,15 +150,17 @@ export const StoryCard = ({ story, onLike, onTogglePublic, onDelete, isPublicVie
           )}
         </div>
         
-        {/* Book Title on Spine */}
-        <div className="absolute bottom-4 left-2 right-4">
-          <h3 className="font-bold text-xs text-primary/90 line-clamp-2 leading-tight drop-shadow-sm">
-            {story.title}
-          </h3>
-          <p className="text-xs text-primary/70 mt-1 font-medium">
-            {story.child_name}
-          </p>
-        </div>
+        {/* Book Title on Spine - Only show when no image */}
+        {!storyImageUrl && (
+          <div className="absolute bottom-4 left-2 right-4">
+            <h3 className="font-bold text-xs text-primary/90 line-clamp-2 leading-tight drop-shadow-sm">
+              {story.title}
+            </h3>
+            <p className="text-xs text-primary/70 mt-1 font-medium">
+              {story.child_name}
+            </p>
+          </div>
+        )}
         
         {/* Book Pages Effect */}
         <div className="absolute right-0 top-1 bottom-1 w-2 bg-gradient-to-r from-background/20 to-background/40 opacity-60"></div>
