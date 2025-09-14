@@ -132,50 +132,8 @@ const StoryImage: React.FC<{
         <AlertCircle className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
         <div className="flex flex-col gap-3">
           <span className="text-lg text-muted-foreground font-medium">Image not available</span>
-          <Button 
-            variant="default" 
-            onClick={async () => {
-              try {
-                setGenerating(true);
-                console.log(`Generating image for page ${pageNumber}...`);
-                
-                const response = await supabase.functions.invoke('generate-page-image', {
-                  body: { 
-                    storyId: storyId,
-                    pageNumber: pageNumber
-                  }
-                });
-
-                if (response.error) {
-                  console.error('Error generating image:', response.error);
-                  setImageError(true);
-                } else {
-                  console.log('Image generated successfully:', response.data);
-                  setImageUrl(response.data?.imageUrl);
-                  // Refresh the page to show the new image
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 1000);
-                }
-              } catch (err) {
-                console.error('Error generating image:', err);
-                setImageError(true);
-              } finally {
-                setGenerating(false);
-              }
-            }}
-            disabled={generating}
-            className="px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            {generating ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            {generating ? 'Generating...' : 'Generate Image'}
-          </Button>
           <p className="text-sm text-muted-foreground text-center">
-            Click to generate this page's illustration
+            This page's illustration is currently unavailable
           </p>
         </div>
       </div>
@@ -909,7 +867,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
         {/* Book Shadow */}
         <div className="absolute inset-x-6 bottom-2 h-6 bg-gradient-to-t from-black/15 to-transparent blur-2xl rounded-full" />
         
-        <div className="relative bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20 rounded-3xl shadow-2xl border-4 border-white dark:border-gray-700 overflow-hidden transform-gpu">
+        <div className="relative bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20 rounded-3xl shadow-2xl border-4 border-white dark:border-gray-700 overflow-hidden transform-gpu max-w-7xl mx-auto">
           {/* Colorful Book Spine */}
           <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-b from-red-400 via-orange-400 via-yellow-400 via-green-400 via-blue-400 via-indigo-400 to-purple-400 shadow-inner" />
           <div className="absolute left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-red-300 to-purple-300 opacity-60" />
@@ -937,8 +895,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
             </div>
           ) : currentPageData ? (
             <div className="min-h-[700px] flex flex-col lg:flex-row relative">
-              {/* Image Side */}
-              <div className="flex-1 relative bg-gradient-to-br from-sky-100 via-cyan-50 to-blue-100 dark:from-sky-900/20 dark:via-cyan-900/20 dark:to-blue-900/20">
+              {/* Image Side - Made wider to show more of the photo */}
+              <div className="flex-[2] relative bg-gradient-to-br from-sky-100 via-cyan-50 to-blue-100 dark:from-sky-900/20 dark:via-cyan-900/20 dark:to-blue-900/20">
                 <div className="relative h-full min-h-[350px] lg:min-h-[700px] p-8">
                   <div className="h-full rounded-2xl overflow-hidden shadow-xl border-4 border-white dark:border-gray-600 bg-white dark:bg-gray-800">
                     <StoryImage
