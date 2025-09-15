@@ -867,7 +867,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
         {/* Book Shadow */}
         <div className="absolute inset-x-6 bottom-2 h-6 bg-gradient-to-t from-black/15 to-transparent blur-2xl rounded-full" />
         
-        <div className="relative bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20 rounded-3xl shadow-2xl border-4 border-white dark:border-gray-700 overflow-hidden transform-gpu max-w-7xl mx-auto">
+        <div className="relative bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20 rounded-3xl shadow-2xl border-4 border-white dark:border-gray-700 overflow-hidden transform-gpu max-w-full mx-8">
           {/* Colorful Book Spine */}
           <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-b from-red-400 via-orange-400 via-yellow-400 via-green-400 via-blue-400 via-indigo-400 to-purple-400 shadow-inner" />
           <div className="absolute left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-red-300 to-purple-300 opacity-60" />
