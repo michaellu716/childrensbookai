@@ -50,112 +50,121 @@ const StoryImage: React.FC<{
   alt?: string;
 }> = ({ pageId, pageNumber, storyId, alt = "Story page" }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [imageError, setImageError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
+  const maxRetries = 5;
 
-  const loadImage = useCallback(async (isRetry = false) => {
+  const loadImage = useCallback(async (attempt = 0) => {
     try {
-      if (!isRetry) setLoading(true);
-      setImageError(false);
+      console.log(`Loading image for page ${pageNumber}, attempt ${attempt + 1}/${maxRetries + 1}`);
       
       const response = await supabase.functions.invoke('get-page-image', {
         body: { pageId }
       });
 
-      if (response.error) {
-        console.error('Error loading image:', response.error);
-        if (!isRetry && retryCount < maxRetries) {
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-            loadImage(true);
-          }, 1000 * (retryCount + 1)); // Exponential backoff
-        } else {
-          setImageError(true);
-        }
-      } else {
-        if (response.data?.image_url) {
-          setImageUrl(response.data.image_url);
-          setRetryCount(0); // Reset retry count on success
-        } else {
-          setImageError(true);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading image:', err);
-      if (!isRetry && retryCount < maxRetries) {
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          loadImage(true);
-        }, 1000 * (retryCount + 1)); // Exponential backoff
-      } else {
-        setImageError(true);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [pageId, retryCount, maxRetries]);
+      console.log(`Image response for page ${pageNumber}:`, response);
 
-  const handleRetryLoad = () => {
-    setRetryCount(0);
-    loadImage();
-  };
+      if (response.error) {
+        console.error(`Error loading image for page ${pageNumber}:`, response.error);
+        throw new Error(response.error.message || 'Failed to load image');
+      }
+
+      if (response.data?.image_url) {
+        console.log(`Successfully loaded image for page ${pageNumber}:`, response.data.image_url);
+        setImageUrl(response.data.image_url);
+        setRetryCount(0);
+        setLoading(false);
+        return;
+      }
+
+      // If no image_url, treat as missing image but don't retry indefinitely
+      console.log(`No image URL for page ${pageNumber}, showing placeholder`);
+      setImageUrl(null);
+      setLoading(false);
+
+    } catch (err) {
+      console.error(`Error loading image for page ${pageNumber}, attempt ${attempt + 1}:`, err);
+      
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff, max 5s
+        console.log(`Retrying in ${delay}ms...`);
+        setTimeout(() => {
+          setRetryCount(attempt + 1);
+          loadImage(attempt + 1);
+        }, delay);
+      } else {
+        console.log(`Max retries reached for page ${pageNumber}, showing placeholder`);
+        setImageUrl(null);
+        setLoading(false);
+      }
+    }
+  }, [pageId, pageNumber, maxRetries]);
 
   useEffect(() => {
+    setLoading(true);
+    setImageUrl(null);
+    setRetryCount(0);
     loadImage();
   }, [pageId, pageNumber, storyId, loadImage]);
 
-  if (loading) {
-    return (
-      <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border border-gray-200 dark:border-gray-600 rounded-xl">
-        <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
-        <span className="text-lg text-muted-foreground font-medium">
-          Loading image...
-          {retryCount > 0 && ` (Retry ${retryCount}/${maxRetries})`}
-        </span>
-      </div>
-    );
-  }
-
-  if (!imageUrl || imageError) {
-    return (
-      <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
-        <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-        <div className="flex flex-col gap-3 items-center">
-          <span className="text-lg text-muted-foreground font-medium">Image not available</span>
-          <p className="text-sm text-muted-foreground text-center">
-            This page's illustration is currently unavailable
-          </p>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRetryLoad}
-            className="mt-2"
-            disabled={loading}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Try again
-          </Button>
+  // Always render content - never show just a loading state indefinitely
+  const renderContent = () => {
+    if (loading && retryCount === 0) {
+      return (
+        <div className="w-full h-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20 flex flex-col items-center justify-center">
+          <div className="h-8 w-8 border-3 border-primary/30 border-t-primary rounded-full animate-spin mb-3"></div>
+          <span className="text-sm text-muted-foreground">Loading page {pageNumber}...</span>
         </div>
+      );
+    }
+
+    if (imageUrl) {
+      return (
+        <img
+          src={imageUrl}
+          alt={alt}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            console.error(`Image failed to load for page ${pageNumber}:`, imageUrl);
+            setImageUrl(null); // Trigger fallback
+          }}
+          onLoad={() => {
+            console.log(`Image successfully displayed for page ${pageNumber}`);
+          }}
+        />
+      );
+    }
+
+    // Fallback illustration - always show something beautiful
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 dark:from-purple-900/30 dark:via-pink-900/20 dark:to-blue-900/30 flex flex-col items-center justify-center p-8 relative overflow-hidden">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-4 left-4 text-2xl animate-pulse">📚</div>
+          <div className="absolute top-8 right-8 text-lg animate-bounce animation-delay-500">✨</div>
+          <div className="absolute bottom-8 left-8 text-xl animate-pulse animation-delay-1000">🌟</div>
+          <div className="absolute bottom-4 right-4 text-2xl animate-bounce animation-delay-1500">🎨</div>
+        </div>
+        
+        <div className="text-6xl mb-4 animate-pulse">📖</div>
+        <div className="text-center space-y-2">
+          <p className="text-lg font-semibold text-primary">Page {pageNumber}</p>
+          <p className="text-sm text-muted-foreground max-w-48 leading-relaxed">
+            Your story illustration will appear here
+          </p>
+        </div>
+        
+        {loading && retryCount > 0 && (
+          <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="h-3 w-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+            <span>Loading attempt {retryCount + 1}...</span>
+          </div>
+        )}
       </div>
     );
-  }
+  };
 
-  return (
-    <img
-      src={imageUrl}
-      alt={alt}
-      className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-      onError={() => {
-        setImageError(true);
-        if (retryCount < maxRetries) {
-          setTimeout(() => handleRetryLoad(), 1000);
-        }
-      }}
-    />
-  );
+  return renderContent();
 };
 
 export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView = false }) => {
