@@ -4,8 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 export interface PublicStory {
   id: string;
   title: string;
-  child_name: string;
-  child_age: string;
   themes: string[];
   art_style: string;
   length: number;
@@ -15,10 +13,10 @@ export interface PublicStory {
 }
 
 const fetchPublicStoriesOptimized = async (): Promise<PublicStory[]> => {
-  // Fast query - get public stories only, no joins to avoid timeouts
+  // Secure query - only fetch non-sensitive data for public stories
   const { data: storiesData, error } = await supabase
     .from('stories')
-    .select('id, title, child_name, child_age, themes, art_style, length, created_at, likes')
+    .select('id, title, themes, art_style, length, created_at, likes')
     .eq('is_public', true)
     .eq('status', 'completed') // Only show completed public stories
     .order('likes', { ascending: false })

@@ -36,22 +36,14 @@ const PublicStories = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Memoize filtered stories and statistics
-  const { filteredStories, totalCharacters } = useMemo(() => {
+  // Memoize filtered stories and statistics (without accessing child personal info)
+  const { filteredStories, totalStories } = useMemo(() => {
     const lowerSearchQuery = searchQuery.toLowerCase();
     
-    const uniqueCharacters = new Set<string>();
-    
     const filtered = stories.filter(story => {
-      // Add to character count
-      if (story.child_name) {
-        uniqueCharacters.add(story.child_name.toLowerCase());
-      }
-
-      // Apply search filter
+      // Apply search filter (only on safe, non-personal fields)
       const matchesSearch = !searchQuery || 
         story.title.toLowerCase().includes(lowerSearchQuery) ||
-        story.child_name?.toLowerCase().includes(lowerSearchQuery) ||
         story.themes?.some(theme => theme.toLowerCase().includes(lowerSearchQuery));
 
       // Apply status filter (for public stories, we only show completed ones)
@@ -62,7 +54,7 @@ const PublicStories = () => {
 
     return {
       filteredStories: filtered,
-      totalCharacters: uniqueCharacters.size
+      totalStories: stories.length
     };
   }, [stories, searchQuery, selectedFilter]);
 
@@ -164,12 +156,12 @@ const PublicStories = () => {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full"></div>
                 <span className="font-medium">{filteredStories.length}</span>
-                <span>Stories</span>
+                <span>Stories Found</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-accent rounded-full"></div>
-                <span className="font-medium">{totalCharacters}</span>
-                <span>Characters</span>
+                <span className="font-medium">{totalStories}</span>
+                <span>Total Public Stories</span>
               </div>
             </div>
           </div>
@@ -179,7 +171,7 @@ const PublicStories = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search by title, character name, or themes..."
+                placeholder="Search by title or themes..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
