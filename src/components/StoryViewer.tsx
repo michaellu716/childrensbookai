@@ -895,17 +895,15 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
             </div>
           ) : currentPageData ? (
             <div className="min-h-[700px] flex flex-col lg:flex-row relative">
-              {/* Image Side - Made wider to show more of the photo */}
-              <div className="flex-[2] relative bg-gradient-to-br from-sky-100 via-cyan-50 to-blue-100 dark:from-sky-900/20 dark:via-cyan-900/20 dark:to-blue-900/20">
-                <div className="relative h-full min-h-[350px] lg:min-h-[700px] p-8">
-                  <div className="h-full rounded-2xl overflow-hidden shadow-xl border-4 border-white dark:border-gray-600 bg-white dark:bg-gray-800">
-                    <StoryImage
-                      pageId={currentPageData.id}
-                      pageNumber={currentPageData.page_number}
-                      storyId={story.id}
-                      alt={`Page ${currentPageData.page_number}`}
-                    />
-                  </div>
+              {/* Image Side - Full page image */}
+              <div className="flex-[2] relative">
+                <div className="relative h-full min-h-[350px] lg:min-h-[700px]">
+                  <StoryImage
+                    pageId={currentPageData.id}
+                    pageNumber={currentPageData.page_number}
+                    storyId={story.id}
+                    alt={`Page ${currentPageData.page_number}`}
+                  />
                 </div>
               </div>
               
