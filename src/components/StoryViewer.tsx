@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,74 +53,67 @@ const StoryImage: React.FC<{
   const [imageError, setImageError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
+
+  const loadImage = useCallback(async (isRetry = false) => {
+    try {
+      if (!isRetry) setLoading(true);
+      setImageError(false);
+      
+      const response = await supabase.functions.invoke('get-page-image', {
+        body: { pageId }
+      });
+
+      if (response.error) {
+        console.error('Error loading image:', response.error);
+        if (!isRetry && retryCount < maxRetries) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+            loadImage(true);
+          }, 1000 * (retryCount + 1)); // Exponential backoff
+        } else {
+          setImageError(true);
+        }
+      } else {
+        if (response.data?.image_url) {
+          setImageUrl(response.data.image_url);
+          setRetryCount(0); // Reset retry count on success
+        } else {
+          setImageError(true);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading image:', err);
+      if (!isRetry && retryCount < maxRetries) {
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          loadImage(true);
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+      } else {
+        setImageError(true);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [pageId, retryCount, maxRetries]);
+
+  const handleRetryLoad = () => {
+    setRetryCount(0);
+    loadImage();
+  };
 
   useEffect(() => {
-    const loadImage = async () => {
-      try {
-        setLoading(true);
-        const response = await supabase.functions.invoke('get-page-image', {
-          body: { pageId }
-        });
-
-        if (response.error) {
-          console.error('Error loading image:', response.error);
-          setImageError(true);
-        } else {
-          if (response.data?.image_url) {
-            setImageUrl(response.data.image_url);
-          } else {
-            // Simply show error instead of auto-generating to save OpenAI credits
-            setImageError(true);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading image:', err);
-        setImageError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const generatePageImage = async () => {
-      try {
-        setGenerating(true);
-        console.log(`Auto-generating image for page ${pageNumber}...`);
-        
-        const response = await supabase.functions.invoke('generate-page-image', {
-          body: { 
-            storyId: storyId,
-            pageNumber: pageNumber
-          }
-        });
-
-        if (response.error) {
-          console.error('Error generating image:', response.error);
-          setImageError(true);
-        } else {
-          console.log('Image generated successfully:', response.data);
-          setImageUrl(response.data?.imageUrl);
-          // Refresh to get the new image
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        }
-      } catch (err) {
-        console.error('Error generating image:', err);
-        setImageError(true);
-      } finally {
-        setGenerating(false);
-      }
-    };
-
     loadImage();
-  }, [pageId, pageNumber, storyId]);
+  }, [pageId, pageNumber, storyId, loadImage]);
 
-  if (loading || generating) {
+  if (loading) {
     return (
-      <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border border-gray-200 dark:border-gray-600 rounded-xl animate-pulse">
-        <div className="h-12 w-12 bg-gray-300 dark:bg-gray-600 rounded-full mb-4"></div>
+      <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border border-gray-200 dark:border-gray-600 rounded-xl">
+        <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
         <span className="text-lg text-muted-foreground font-medium">
-          {generating ? `Generating image for page ${pageNumber}...` : 'Loading image...'}
+          Loading image...
+          {retryCount > 0 && ` (Retry ${retryCount}/${maxRetries})`}
         </span>
       </div>
     );
@@ -129,12 +122,22 @@ const StoryImage: React.FC<{
   if (!imageUrl || imageError) {
     return (
       <div className="w-full h-full bg-gradient-to-br from-gray-100 via-gray-50 to-white dark:from-gray-800 dark:via-gray-700 dark:to-gray-600 flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
-        <AlertCircle className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
-        <div className="flex flex-col gap-3">
+        <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+        <div className="flex flex-col gap-3 items-center">
           <span className="text-lg text-muted-foreground font-medium">Image not available</span>
           <p className="text-sm text-muted-foreground text-center">
             This page's illustration is currently unavailable
           </p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRetryLoad}
+            className="mt-2"
+            disabled={loading}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Try again
+          </Button>
         </div>
       </div>
     );
@@ -145,7 +148,12 @@ const StoryImage: React.FC<{
       src={imageUrl}
       alt={alt}
       className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-      onError={() => setImageError(true)}
+      onError={() => {
+        setImageError(true);
+        if (retryCount < maxRetries) {
+          setTimeout(() => handleRetryLoad(), 1000);
+        }
+      }}
     />
   );
 };
