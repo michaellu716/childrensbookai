@@ -37,11 +37,12 @@ const Characters = () => {
   const { data: characters = [], isLoading, error } = useCharactersQuery(user?.id);
 
   useEffect(() => {
-    if (error) {
+    // Only show error if we have a user but still get an error (to avoid showing error when user is loading)
+    if (error && user) {
       console.error('Error fetching characters:', error);
       toast.error('Failed to load characters');
     }
-  }, [error]);
+  }, [error, user]);
 
   // Memoize filtering without side effects
   const filteredCharacters = useMemo(() => {
