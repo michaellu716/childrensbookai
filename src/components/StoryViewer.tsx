@@ -909,9 +909,9 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
                 </div>
               </div>
               
-              {/* Text Side */}
+              {/* Text Side - Made same width as image side */}
               {currentPageData.text_content && (
-                <div className="flex-1 relative bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20">
+                <div className="flex-[2] relative bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20">
                   {/* Decorative elements instead of lines */}
                   <div className="absolute inset-0 opacity-20">
                     <div className="absolute top-8 left-8 text-4xl text-pink-400">🌸</div>
@@ -1090,21 +1090,6 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ storyId, isPublicView 
       {/* Colorful Action Buttons - Only show for authenticated users */}
       {!isPublicView && (
         <div className="flex justify-center gap-8 pt-6">
-          {/* Check if story has missing images and show regenerate button */}
-          {pages.some(page => !page.image_url) && (
-            <Button 
-              onClick={retryIllustrations}
-              disabled={retryingIllustrations}
-              className="px-10 py-4 rounded-3xl font-bold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-r from-green-400 via-teal-500 to-blue-500 hover:from-green-500 hover:via-teal-600 hover:to-blue-600 text-white group"
-            >
-              {retryingIllustrations ? (
-                <Loader2 className="h-6 w-6 mr-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-6 w-6 mr-3 group-hover:rotate-180 transition-transform" />
-              )}
-              Regenerate Images
-            </Button>
-          )}
           <Button 
             onClick={handleDownloadPDF} 
             disabled={isDownloadingPDF}
