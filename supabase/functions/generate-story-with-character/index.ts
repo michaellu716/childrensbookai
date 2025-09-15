@@ -225,18 +225,6 @@ IMPORTANT:
       throw new Error(`Failed to save story: ${storyError?.message || 'Unknown error'}`);
     }
 
-    // Generate illustrations for each page in background
-    console.log('Starting illustration generation...');
-    
-    // Use background task for illustrations
-    EdgeRuntime.waitUntil(generateStoryIllustrations(
-      savedStory.id, 
-      story.pages, 
-      characterSheet, 
-      selectedAvatarStyle,
-      supabase
-    ));
-
     // Save story pages (text only initially)
     const pageInserts = story.pages.map((page: any) => ({
       story_id: savedStory.id,
@@ -254,11 +242,88 @@ IMPORTANT:
       throw new Error(`Failed to save story pages: ${pagesError.message}`);
     }
 
+    console.log('Starting illustration generation and waiting for completion...');
+    
+    // Wait for all illustrations to be generated and validated before returning
+    await generateStoryIllustrations(
+      savedStory.id, 
+      story.pages, 
+      characterSheet, 
+      selectedAvatarStyle,
+      supabase
+    );
+
+    // Verify all images are valid before returning success
+    const { data: finalPages, error: verifyError } = await supabase
+      .from('story_pages')
+      .select('page_number, image_url')
+      .eq('story_id', savedStory.id);
+
+    if (verifyError) {
+      throw new Error(`Failed to verify story completion: ${verifyError.message}`);
+    }
+
+    // Check that all pages have valid images
+    const invalidPages = finalPages?.filter(p => !p.image_url || p.image_url.trim() === '') || [];
+    
+    if (invalidPages.length > 0) {
+      console.error(`Story ${savedStory.id} has ${invalidPages.length} pages without valid images`);
+      
+      // Update story status to failed
+      await supabase
+        .from('stories')
+        .update({ status: 'failed' })
+        .eq('id', savedStory.id);
+        
+      throw new Error(`Failed to generate valid images for all pages. ${invalidPages.length} pages are missing images.`);
+    }
+
+    // Validate that image URLs are actually fetchable
+    const imageValidationPromises = finalPages?.map(async (page) => {
+      if (!page.image_url) return { page: page.page_number, valid: false };
+      
+      try {
+        // For base64 images, check that they're properly formatted
+        if (page.image_url.startsWith('data:image/')) {
+          return { page: page.page_number, valid: page.image_url.length > 1000 };
+        }
+        
+        // For URL images, attempt to fetch them
+        const response = await fetch(page.image_url, { method: 'HEAD' });
+        return { page: page.page_number, valid: response.ok };
+      } catch {
+        return { page: page.page_number, valid: false };
+      }
+    }) || [];
+
+    const validationResults = await Promise.all(imageValidationPromises);
+    const invalidImages = validationResults.filter(r => !r.valid);
+    
+    if (invalidImages.length > 0) {
+      console.error(`Story ${savedStory.id} has ${invalidImages.length} pages with invalid image URLs`);
+      
+      // Update story status to failed
+      await supabase
+        .from('stories')
+        .update({ status: 'failed' })
+        .eq('id', savedStory.id);
+        
+      throw new Error(`Failed to validate image URLs for pages: ${invalidImages.map(i => i.page).join(', ')}`);
+    }
+
+    // Update story status to completed only if all images are valid
+    await supabase
+      .from('stories')
+      .update({ status: 'completed' })
+      .eq('id', savedStory.id);
+
+    console.log(`Story ${savedStory.id} completed successfully with all valid images`);
+
     return new Response(JSON.stringify({ 
       storyId: savedStory.id,
       story: story,
       characterSheetId: savedCharacterSheet?.id || null,
-      status: 'generating_illustrations'
+      status: 'completed'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -343,10 +408,33 @@ async function generateStoryIllustrations(
         const imageData = await imageResponse.json();
         console.log(`Image response for page ${page.pageNumber}:`, JSON.stringify(imageData).substring(0, 200));
         
-        // gpt-image-1 returns base64 directly
+        // gpt-image-1 returns base64 directly - upload to storage for stability
         const base64Data = imageData.data[0].b64_json;
-        const imageUrl = `data:image/png;base64,${base64Data}`;
-        console.log(`Generated image URL length for page ${page.pageNumber}:`, imageUrl.length);
+        
+        // Convert base64 to binary data for storage
+        const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        
+        // Upload to Supabase Storage for stable URLs
+        const fileName = `story-${storyId}/page-${page.pageNumber}-${Date.now()}.webp`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('story-images')
+          .upload(fileName, imageBuffer, {
+            contentType: 'image/webp',
+            cacheControl: '3600'
+          });
+
+        if (uploadError) {
+          console.error(`Failed to upload image to storage for page ${page.pageNumber}:`, uploadError);
+          return { pageNumber: page.pageNumber, success: false, error: uploadError.message };
+        }
+
+        // Get the public URL for the uploaded image
+        const { data: { publicUrl } } = supabase.storage
+          .from('story-images')
+          .getPublicUrl(fileName);
+        
+        const imageUrl = publicUrl;
+        console.log(`Generated and uploaded image for page ${page.pageNumber} to: ${imageUrl}`);
 
         // Update story page with generated image
         const { error: updateError } = await supabase
@@ -385,15 +473,16 @@ async function generateStoryIllustrations(
       .from('story_pages')
       .select('page_number')
       .eq('story_id', storyId)
-      .is('image_url', null);
+      .or('image_url.is.null,image_url.eq.""');
 
     if (checkError) {
       console.error('Failed to verify missing pages:', checkError);
+      throw new Error('Failed to verify page completion');
     }
 
-    // Retry failed pages up to 3 times
+    // Retry failed pages up to 5 times with more aggressive approach
     let retryAttempts = 0;
-    const maxRetries = 3;
+    const maxRetries = 5;
     let remainingFailedPages = missingPages || [];
 
     while (remainingFailedPages.length > 0 && retryAttempts < maxRetries) {
@@ -456,8 +545,34 @@ async function generateStoryIllustrations(
           }
 
           const imageData = await imageResponse.json();
+          
+          // gpt-image-1 returns base64 directly - upload to storage for stability
           const base64Data = imageData.data[0].b64_json;
-          const imageUrl = `data:image/png;base64,${base64Data}`;
+          
+          // Convert base64 to binary data for storage
+          const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+          
+          // Upload to Supabase Storage for stable URLs
+          const fileName = `story-${storyId}/page-${page.pageNumber}-retry-${retryAttempts}-${Date.now()}.webp`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('story-images')
+            .upload(fileName, imageBuffer, {
+              contentType: 'image/webp',
+              cacheControl: '3600'
+            });
+
+          if (uploadError) {
+            console.error(`Failed to upload retry image to storage for page ${page.pageNumber}:`, uploadError);
+            return { pageNumber: page.pageNumber, success: false, error: uploadError.message };
+          }
+
+          // Get the public URL for the uploaded image
+          const { data: { publicUrl } } = supabase.storage
+            .from('story-images')
+            .getPublicUrl(fileName);
+          
+          const imageUrl = publicUrl;
+          console.log(`Generated and uploaded retry image for page ${page.pageNumber} to: ${imageUrl}`);
 
           // Retry database update with timeout protection
           let updateSuccess = false;

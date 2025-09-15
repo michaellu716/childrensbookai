@@ -159,13 +159,58 @@ serve(async (req) => {
     // imageData is already set in the retry loop above
     console.log(`Image generated successfully for page ${pageNumber}`);
     
-    // GPT-Image-1 returns base64 data directly
+    // GPT-Image-1 returns base64 data directly - upload to storage for stability
     const base64Data = imageData.data[0].b64_json;
-    const imageUrl = `data:image/png;base64,${base64Data}`;
     
-    console.log(`Image generated successfully for page ${pageNumber}, storing as base64`);
+    // Convert base64 to binary data for storage
+    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    
+    // Upload to Supabase Storage for stable URLs
+    const fileName = `story-${storyId}/page-${pageNumber}-${Date.now()}.webv`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('story-images')
+      .upload(fileName, imageBuffer, {
+        contentType: 'image/webp',
+        cacheControl: '3600'
+      });
 
-    // Update the page with the base64 image data (consistent with main story generation)
+    if (uploadError) {
+      console.error(`Failed to upload image to storage for page ${pageNumber}:`, uploadError);
+      return new Response(JSON.stringify({ 
+        error: "Failed to upload image to storage", 
+        details: uploadError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get the public URL for the uploaded image
+    const { data: { publicUrl } } = supabase.storage
+      .from('story-images')
+      .getPublicUrl(fileName);
+    
+    const imageUrl = publicUrl;
+    console.log(`Image generated successfully for page ${pageNumber}, uploaded to: ${imageUrl}`);
+
+    // Validate the image URL is accessible
+    try {
+      const validationResponse = await fetch(imageUrl, { method: 'HEAD' });
+      if (!validationResponse.ok) {
+        throw new Error(`Image URL validation failed: ${validationResponse.status}`);
+      }
+    } catch (validationError) {
+      console.error(`Image URL validation failed for page ${pageNumber}:`, validationError);
+      return new Response(JSON.stringify({ 
+        error: "Generated image is not accessible", 
+        details: validationError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Update the page with the storage URL
     const { error: updateError } = await supabase
       .from('story_pages')
       .update({ 
