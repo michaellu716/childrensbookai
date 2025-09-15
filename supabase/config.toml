@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.convert-storage-to-base64]
 verify_jwt = true
+
+[functions.fix-missing-story-images]
+verify_jwt = false

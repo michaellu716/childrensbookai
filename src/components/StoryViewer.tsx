@@ -52,7 +52,40 @@ const StoryImage: React.FC<{
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
+  const [fixingImage, setFixingImage] = useState(false);
   const maxRetries = 5;
+
+  const fixMissingImage = useCallback(async () => {
+    setFixingImage(true);
+    try {
+      console.log(`Attempting to fix missing image for page ${pageNumber}`);
+      
+      const response = await supabase.functions.invoke('fix-missing-story-images', {
+        body: { storyId }
+      });
+
+      if (response.error) {
+        console.error(`Error fixing image for page ${pageNumber}:`, response.error);
+        toast.error(`Failed to fix image: ${response.error.message}`);
+        return;
+      }
+
+      console.log(`Fix response for story ${storyId}:`, response);
+      
+      if (response.data?.success) {
+        toast.success(`Images fixed! Refreshing page ${pageNumber}...`);
+        // Retry loading the image after fixing
+        setTimeout(() => {
+          loadImage(0);
+        }, 2000);
+      }
+    } catch (err) {
+      console.error(`Error fixing image for page ${pageNumber}:`, err);
+      toast.error('Failed to fix missing image');
+    } finally {
+      setFixingImage(false);
+    }
+  }, [pageNumber, storyId]);
 
   const loadImage = useCallback(async (attempt = 0) => {
     try {
@@ -147,11 +180,29 @@ const StoryImage: React.FC<{
         </div>
         
         <div className="text-6xl mb-4 animate-pulse">📖</div>
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
           <p className="text-lg font-semibold text-primary">Page {pageNumber}</p>
           <p className="text-sm text-muted-foreground max-w-48 leading-relaxed">
-            Your story illustration will appear here
+            Image not available
           </p>
+          <Button 
+            onClick={fixMissingImage}
+            disabled={fixingImage}
+            size="sm"
+            className="bg-primary hover:bg-primary/90 mt-3"
+          >
+            {fixingImage ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Fixing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Fix Missing Image
+              </>
+            )}
+          </Button>
         </div>
         
         {loading && retryCount > 0 && (
