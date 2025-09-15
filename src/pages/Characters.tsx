@@ -6,7 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { Search, Users, ArrowLeft, Sparkles, Loader2, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useCharactersQuery, type Character } from "@/hooks/useCharactersQuery";
+import { usePaginatedCharactersQuery } from "@/hooks/usePaginatedCharactersQuery";
+import type { Character } from "@/hooks/usePaginatedCharactersQuery";
 import { CharacterCard } from "@/components/CharacterCard";
 import { useQueryClient } from '@tanstack/react-query';
 import { Footer } from "@/components/Footer";
@@ -34,53 +35,34 @@ const Characters = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const { data: characters = [], isLoading, error } = useCharactersQuery(user?.id);
+  // Use database-level pagination for better performance
+  const { 
+    data: paginatedResult, 
+    isLoading, 
+    error,
+    isPending
+  } = usePaginatedCharactersQuery(
+    currentPage,
+    CHARACTERS_PER_PAGE,
+    user?.id, // Show user's characters when logged in, all when not
+    searchQuery
+  );
+
+  const characters = paginatedResult?.characters || [];
+  const totalCount = paginatedResult?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / CHARACTERS_PER_PAGE);
 
   useEffect(() => {
-    // Only show error if we have a user but still get an error (to avoid showing error when user is loading)
-    if (error && user) {
+    if (error) {
       console.error('Error fetching characters:', error);
       toast.error('Failed to load characters');
     }
-  }, [error, user]);
+  }, [error]);
 
-  // Memoize filtering without side effects
-  const filteredCharacters = useMemo(() => {
-    const base = !searchQuery
-      ? [...characters]
-      : characters.filter(character => {
-          const q = searchQuery.toLowerCase();
-          return (
-            character.name?.toLowerCase().includes(q) ||
-            character.hair_color?.toLowerCase().includes(q) ||
-            character.eye_color?.toLowerCase().includes(q) ||
-            character.typical_outfit?.toLowerCase().includes(q)
-          );
-        });
-
-    return base.sort((a, b) => {
-      const likeDiff = (b.likes || 0) - (a.likes || 0);
-      if (likeDiff !== 0) return likeDiff;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-  }, [characters, searchQuery]);
-
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredCharacters.length / CHARACTERS_PER_PAGE);
-  
-  // Reset to page 1 when filters change (in useEffect to avoid infinite renders)
+  // Reset to page 1 when search changes
   useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
-  }, [filteredCharacters.length, currentPage, totalPages]);
-
-  // Calculate paginated results
-  const paginatedCharacters = useMemo(() => {
-    const startIndex = (currentPage - 1) * CHARACTERS_PER_PAGE;
-    const endIndex = startIndex + CHARACTERS_PER_PAGE;
-    return filteredCharacters.slice(startIndex, endIndex);
-  }, [filteredCharacters, currentPage]);
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const handleLike = async (characterId: string) => {
     try {
@@ -89,13 +71,20 @@ const Characters = () => {
 
       const newLikes = (character.likes ?? 0) + 1;
       
-      // Optimistic update
-      queryClient.setQueryData(['characters'], (oldData: Character[] | undefined) => 
-        oldData?.map(char => 
-          char.id === characterId 
-            ? { ...char, likes: newLikes }
-            : char
-        ) || []
+      // Optimistic update for paginated data
+      queryClient.setQueryData(
+        ['characters', 'paginated', currentPage, CHARACTERS_PER_PAGE, user?.id, searchQuery], 
+        (oldData: any) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            characters: oldData.characters.map((char: Character) => 
+              char.id === characterId 
+                ? { ...char, likes: newLikes }
+                : char
+            )
+          };
+        }
       );
 
       const { error } = await supabase
@@ -105,12 +94,19 @@ const Characters = () => {
 
       if (error) {
         // Revert optimistic update on error
-        queryClient.setQueryData(['characters'], (oldData: Character[] | undefined) => 
-          oldData?.map(char => 
-            char.id === characterId 
-              ? { ...char, likes: character.likes }
-              : char
-          ) || []
+        queryClient.setQueryData(
+          ['characters', 'paginated', currentPage, CHARACTERS_PER_PAGE, user?.id, searchQuery],
+          (oldData: any) => {
+            if (!oldData) return oldData;
+            return {
+              ...oldData,
+              characters: oldData.characters.map((char: Character) => 
+                char.id === characterId 
+                  ? { ...char, likes: character.likes }
+                  : char
+              )
+            };
+          }
         );
         throw error;
       }
@@ -123,7 +119,7 @@ const Characters = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isPending) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto">
@@ -195,14 +191,14 @@ const Characters = () => {
             {/* Stats */}
             <div className="flex justify-center gap-6 text-center">
               <div className="bg-gradient-card rounded-lg p-4 shadow-card">
-                <div className="text-2xl font-bold text-primary">{filteredCharacters.length}</div>
+                <div className="text-2xl font-bold text-primary">{totalCount}</div>
                 <div className="text-sm text-muted-foreground">Total Characters</div>
               </div>
               <div className="bg-gradient-card rounded-lg p-4 shadow-card">
                 <div className="text-2xl font-bold text-pink-500">
                   {characters.reduce((sum, char) => sum + (char.likes || 0), 0)}
                 </div>
-                <div className="text-sm text-muted-foreground">Total Likes</div>
+                <div className="text-sm text-muted-foreground">Likes on This Page</div>
               </div>
             </div>
           </div>
@@ -210,7 +206,7 @@ const Characters = () => {
 
         {/* Characters Gallery */}
         <section>
-          {filteredCharacters.length === 0 ? (
+          {characters.length === 0 && !isLoading && !isPending ? (
             <div className="max-w-2xl mx-auto">
               <Card className="p-16 text-center bg-gradient-card border-0 shadow-card">
                 <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -236,7 +232,7 @@ const Characters = () => {
               {/* Character Count and Pagination Info */}
               <div className="flex justify-between items-center mb-6">
                 <p className="text-muted-foreground">
-                  Showing {paginatedCharacters.length} of {filteredCharacters.length} characters
+                  Showing {characters.length} of {totalCount} characters
                 </p>
                 {totalPages > 1 && (
                   <div className="flex items-center gap-2">
@@ -265,7 +261,7 @@ const Characters = () => {
 
               {/* Character Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                {paginatedCharacters.map((character) => (
+                {characters.map((character) => (
                   <CharacterCard
                     key={character.id}
                     character={character}
