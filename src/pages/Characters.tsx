@@ -12,7 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Footer } from "@/components/Footer";
 import type { User } from '@supabase/supabase-js';
 
-const CHARACTERS_PER_PAGE = 24;
+const CHARACTERS_PER_PAGE = 10;
 
 const Characters = () => {
   const navigate = useNavigate();
