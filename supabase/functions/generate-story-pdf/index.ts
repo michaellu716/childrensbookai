@@ -175,7 +175,7 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
     
     const page = pdfDoc.addPage([612, 792]);
     const { width, height } = page.getSize();
-    const margin = 50;
+    const margin = 30;
     let cursorY = height - margin;
 
     // Page header
@@ -186,7 +186,7 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
       font: fontBold,
       color: rgb(0.3, 0.3, 0.3),
     });
-    cursorY -= 40;
+    cursorY -= 25;
 
     // Process image first if available
     if (p.image_url) {
@@ -197,17 +197,17 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
         if (imageResult) {
           const { image, width: imgWidth, height: imgHeight } = imageResult;
           
-          // Calculate smaller image dimensions to reduce memory usage
+          // Calculate larger image dimensions for better visual impact
           const maxImageWidth = width - margin * 2;
-          const maxImageHeight = 200; // Reduced size for better performance
+          const maxImageHeight = 400; // Increased from 200 for bigger images
           
           let drawWidth = imgWidth;
           let drawHeight = imgHeight;
           
-          // Scale image to fit
+          // Scale image to fit - allow larger scale for better visibility
           const widthScale = maxImageWidth / drawWidth;
           const heightScale = maxImageHeight / drawHeight;
-          const scale = Math.min(widthScale, heightScale, 0.8); // Max 80% of original to save memory
+          const scale = Math.min(widthScale, heightScale, 1.2); // Increased from 0.8 to 1.2
           
           drawWidth = drawWidth * scale;
           drawHeight = drawHeight * scale;
@@ -224,11 +224,11 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
           });
           
           console.log(`✅ Image embedded successfully at ${drawWidth}x${drawHeight}`);
-          cursorY = imageY - 20;
+          cursorY = imageY - 10;
         } else {
           // Image failed - show informative placeholder
           console.warn(`⚠️ Could not process image for page ${p.page_number}`);
-          cursorY -= 15;
+          cursorY -= 10;
           if (p.image_url?.includes('.webp')) {
             page.drawText('[WebP image - not supported in PDF format]', {
               x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
@@ -238,21 +238,21 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
               x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
             });
           }
-          cursorY -= 25;
+          cursorY -= 15;
         }
       } catch (imageError: any) {
         console.error(`💥 Image processing failed for page ${p.page_number}:`, imageError.message);
-        cursorY -= 15;
+        cursorY -= 10;
         page.drawText('[Image processing failed]', {
           x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
         });
-        cursorY -= 25;
+        cursorY -= 15;
       }
     }
 
-    // Add text content
+    // Add text content with reduced spacing
     if (p.text_content) {
-      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 18);
+      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 16);
     }
   }
 
