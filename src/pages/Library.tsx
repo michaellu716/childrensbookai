@@ -166,35 +166,60 @@ const Library = () => {
 
   const handleDownloadPDF = async (storyId: string) => {
     try {
-      toast.info('Generating complete PDF...');
+      toast.info('Generating paginated PDF...');
       
-      console.log('Generating complete PDF for story:', storyId);
-      
-      const { data, error } = await supabase.functions.invoke('generate-story-pdf', {
-        body: {
-          storyId,
-          usePagination: false // Generate all pages in a single PDF
-        }
-      });
+      // Use paginated approach (3 pages per batch)
+      let pageOffset = 0;
+      const pageLimit = 3;
+      let hasMorePages = true;
+      const files: string[] = [];
+      let batchCount = 1;
 
-      if (error) {
-        console.error('Error generating PDF:', error);
-        toast.error('Failed to generate PDF');
-        return;
-      }
-      
-      if (data?.pdfUrl) {
-        // Auto-download the complete PDF
-        const link = document.createElement('a');
-        link.href = data.pdfUrl;
-        link.download = data.filename || `story_${storyId}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      while (hasMorePages) {
+        console.log(`Generating PDF batch ${batchCount} for story ${storyId}`);
         
-        toast.success('Complete PDF generated and downloaded successfully!');
-      } else {
-        toast.error('No PDF URL received');
+        const { data, error } = await supabase.functions.invoke('generate-story-pdf', {
+          body: {
+            storyId,
+            pageOffset,
+            pageLimit
+          }
+        });
+
+        if (error) {
+          console.error('Error generating PDF batch:', error);
+          toast.error(`Failed to generate PDF batch ${batchCount}`);
+          break;
+        }
+        
+        if (data?.pdfUrl) {
+          files.push(data.pdfUrl);
+          
+          // Auto-download each batch
+          const link = document.createElement('a');
+          link.href = data.pdfUrl;
+          link.download = data.filename || `story_part${batchCount}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+
+        if (data?.pagination) {
+          hasMorePages = data.pagination.hasMorePages;
+          pageOffset = data.pagination.pageOffset + data.pagination.pageLimit;
+          batchCount++;
+        } else {
+          hasMorePages = false;
+        }
+
+        // Small delay between batches
+        if (hasMorePages) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      if (files.length > 0) {
+        toast.success(`PDF exported successfully! Downloaded ${files.length} file(s).`);
       }
     } catch (error) {
       console.error('Error downloading PDF:', error);
