@@ -121,7 +121,7 @@ serve(async (req) => {
 
 async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   const startTime = Date.now();
-  console.log(`Starting lightweight PDF generation for ${pages.length} pages`);
+  console.log(`Starting PDF generation with images for ${pages.length} pages`);
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -144,14 +144,9 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     if (childName) {
       page.drawText(childName, { x: 50, y: height - 140, size: 14, font, color: rgb(0.2, 0.2, 0.2) });
     }
-    
-    // Note about images
-    page.drawText('Note: This is a text-only version. Images not included for faster generation.', {
-      x: 50, y: height - 180, size: 10, font, color: rgb(0.5, 0.5, 0.5)
-    });
   }
 
-  // Process pages - text only for speed
+  // Process pages with images
   const limitedPages = pages.slice(0, 12); // Limit pages
   
   for (let i = 0; i < limitedPages.length; i++) {
@@ -172,17 +167,57 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     });
     cursorY -= 40;
 
-    // Text content only - no images to avoid CPU timeout
+    // Add image if available
+    if (p.image_url) {
+      console.log(`Embedding image for page ${p.page_number}`);
+      const imageResult = await embedImageOptimized(pdfDoc, p.image_url);
+      if (imageResult) {
+        const { image, width: imgWidth, height: imgHeight } = imageResult;
+        
+        // Calculate image dimensions to fit in page
+        const maxImageWidth = width - margin * 2;
+        const maxImageHeight = 300; // Reserve space for text
+        
+        let drawWidth = imgWidth;
+        let drawHeight = imgHeight;
+        
+        // Scale image to fit
+        if (drawWidth > maxImageWidth) {
+          const scale = maxImageWidth / drawWidth;
+          drawWidth = maxImageWidth;
+          drawHeight = drawHeight * scale;
+        }
+        
+        if (drawHeight > maxImageHeight) {
+          const scale = maxImageHeight / drawHeight;
+          drawHeight = maxImageHeight;
+          drawWidth = drawWidth * scale;
+        }
+        
+        // Center the image horizontally
+        const imageX = margin + (maxImageWidth - drawWidth) / 2;
+        const imageY = cursorY - drawHeight;
+        
+        page.drawImage(image, {
+          x: imageX,
+          y: imageY,
+          width: drawWidth,
+          height: drawHeight,
+        });
+        
+        cursorY = imageY - 20; // Add some space after image
+      } else {
+        // If image failed to load, show placeholder
+        page.drawText('[Image could not be loaded]', {
+          x: margin, y: cursorY - 20, size: 10, font, color: rgb(0.6, 0.6, 0.6)
+        });
+        cursorY -= 40;
+      }
+    }
+
+    // Add text content
     if (p.text_content) {
       cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 20);
-    }
-    
-    // If there was an image, just mention it
-    if (p.image_url) {
-      cursorY -= 20;
-      page.drawText('[Image would appear here in full version]', {
-        x: margin, y: cursorY, size: 10, font, color: rgb(0.6, 0.6, 0.6)
-      });
     }
   }
 
