@@ -268,6 +268,69 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+// Simplified image embedding function - no conversion, just direct embedding
+async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
+  try {
+    console.log(`🖼️ Processing image: ${imageUrl.substring(0, 100)}...`);
+    
+    let imageBytes: Uint8Array;
+    
+    // Handle base64 data URLs
+    if (imageUrl.startsWith('data:image/')) {
+      const [, base64Data] = imageUrl.split(',');
+      if (!base64Data) return null;
+      imageBytes = base64ToBytes(base64Data);
+      console.log(`Processing base64 image: ${imageBytes.length} bytes`);
+    } else {
+      // Handle remote images with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      try {
+        const response = await fetch(imageUrl, { 
+          signal: controller.signal,
+          headers: { 'User-Agent': 'StoryPDF/1.0' }
+        });
+        
+        if (!response.ok) {
+          console.warn(`Fetch failed: ${response.status} for ${imageUrl}`);
+          return null;
+        }
+        
+        imageBytes = new Uint8Array(await response.arrayBuffer());
+        console.log(`Processing remote image: ${imageBytes.length} bytes`);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+    
+    // Size check - reasonable limit
+    if (imageBytes.length > 3 * 1024 * 1024) { // 3MB limit
+      console.warn(`Image too large: ${imageBytes.length} bytes`);
+      return null;
+    }
+    
+    // Try embedding as different formats
+    try {
+      const img = await pdfDoc.embedJpg(imageBytes);
+      console.log(`✅ Successfully embedded as JPEG`);
+      return { image: img, width: img.width, height: img.height };
+    } catch (jpgError) {
+      try {
+        const img = await pdfDoc.embedPng(imageBytes);
+        console.log(`✅ Successfully embedded as PNG`);
+        return { image: img, width: img.width, height: img.height };
+      } catch (pngError) {
+        console.warn(`Could not embed image - unsupported format`);
+        return null;
+      }
+    }
+  } catch (error: any) {
+    console.warn(`Image processing failed: ${error.message}`);
+    return null;
+  }
+}
+
 function drawTextWrapped(
   page: any,
   text: string,
