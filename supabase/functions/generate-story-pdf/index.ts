@@ -207,10 +207,16 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
         cursorY = imageY - 15; // Less spacing
       } else {
         console.error(`❌ Failed to process image for page ${p.page_number}: ${p.image_url}`);
-        // Better fallback message for failed image conversion
-        page.drawText('[Image could not be processed]', {
-          x: margin, y: cursorY - 15, size: 9, font, color: rgb(0.7, 0.7, 0.7)
-        });
+        // More informative message about WebP limitation
+        if (p.image_url && p.image_url.includes('.webp')) {
+          page.drawText('[WebP format - PDF conversion not supported]', {
+            x: margin, y: cursorY - 15, size: 9, font, color: rgb(0.7, 0.7, 0.7)
+          });
+        } else {
+          page.drawText('[Image could not be loaded]', {
+            x: margin, y: cursorY - 15, size: 9, font, color: rgb(0.7, 0.7, 0.7)
+          });
+        }
         cursorY -= 30;
       }
     } else {
@@ -323,77 +329,66 @@ async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ 
 
 async function convertWebPToJpeg(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
   try {
-    console.log(`🎯 Starting WebP to JPEG conversion for: ${imageUrl}`);
+    console.log(`🎯 Attempting to process WebP image: ${imageUrl}`);
     
     // Fetch the WebP image
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     
     try {
-      console.log(`📥 Fetching WebP image...`);
       const response = await fetch(imageUrl, { 
         signal: controller.signal,
         headers: { 'User-Agent': 'PDF-Generator/1.0' }
       });
       
       if (!response.ok) {
-        console.error(`❌ Failed to fetch WebP image: ${response.status} ${response.statusText}`);
+        console.error(`❌ Failed to fetch WebP: ${response.status}`);
         return null;
       }
       
-      console.log(`✅ WebP image fetched successfully, status: ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
       const imageBytes = new Uint8Array(arrayBuffer);
       
-      console.log(`📊 WebP image size: ${imageBytes.length} bytes`);
+      console.log(`📊 WebP size: ${imageBytes.length} bytes`);
       
-      // Check size limit
-      if (imageBytes.length > 3 * 1024 * 1024) { // Increased to 3MB
-        console.warn(`⚠️ WebP image too large: ${imageBytes.length} bytes`);
+      if (imageBytes.length > 2 * 1024 * 1024) {
+        console.warn(`⚠️ Image too large: ${imageBytes.length} bytes`);
         return null;
       }
       
-      // For Deno environment, we need to use a different approach
-      // Let's try to decode WebP using fetch API with canvas
-      console.log(`🔄 Converting WebP to JPEG using canvas...`);
-      
-      // Create a data URL from the WebP bytes
-      const base64 = btoa(String.fromCharCode(...imageBytes));
-      const dataUrl = `data:image/webp;base64,${base64}`;
-      
-      // Try to use ImageData approach for WebP conversion
-      console.log(`🖼️ Creating image bitmap from WebP data...`);
-      
-      // Simple approach: try to embed the WebP directly as JPEG (some libraries auto-convert)
-      try {
-        // First try: see if pdf-lib can handle it as JPEG somehow
-        console.log(`🧪 Attempting direct embed as JPEG...`);
-        const img = await pdfDoc.embedJpg(imageBytes);
-        console.log(`🎉 Successfully embedded WebP as JPEG directly!`);
-        return { image: img, width: img.width, height: img.height };
-      } catch (directError) {
-        console.log(`❌ Direct embed failed: ${directError.message}`);
+      // WebP magic bytes check
+      const isWebP = imageBytes[0] === 0x52 && imageBytes[1] === 0x49 && 
+                     imageBytes[2] === 0x46 && imageBytes[3] === 0x46 &&
+                     imageBytes[8] === 0x57 && imageBytes[9] === 0x45 && 
+                     imageBytes[10] === 0x42 && imageBytes[11] === 0x50;
+                     
+      if (!isWebP) {
+        console.log(`🔄 Not a WebP file, trying direct embed...`);
+        // Try direct embedding as JPEG/PNG
+        try {
+          const img = await pdfDoc.embedJpg(imageBytes);
+          console.log(`✅ Embedded as JPEG`);
+          return { image: img, width: img.width, height: img.height };
+        } catch {
+          try {
+            const img = await pdfDoc.embedPng(imageBytes);
+            console.log(`✅ Embedded as PNG`);
+            return { image: img, width: img.width, height: img.height };
+          } catch (e) {
+            console.error(`❌ Failed to embed: ${e.message}`);
+            return null;
+          }
+        }
       }
       
-      // Second try: attempt PNG embedding
-      try {
-        console.log(`🧪 Attempting direct embed as PNG...`);
-        const img = await pdfDoc.embedPng(imageBytes);
-        console.log(`🎉 Successfully embedded WebP as PNG directly!`);
-        return { image: img, width: img.width, height: img.height };
-      } catch (pngError) {
-        console.log(`❌ PNG embed failed: ${pngError.message}`);
-      }
-      
-      console.error(`❌ All conversion attempts failed for WebP image`);
+      console.log(`⚠️ Confirmed WebP format - cannot process in PDF (pdf-lib limitation)`);
       return null;
       
     } finally {
       clearTimeout(timeoutId);
     }
   } catch (error: any) {
-    console.error(`💥 WebP to JPEG conversion error: ${error.message}`);
-    console.error(`Stack trace: ${error.stack}`);
+    console.error(`💥 WebP processing error: ${error.message}`);
     return null;
   }
 }
