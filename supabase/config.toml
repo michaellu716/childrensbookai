@@ -1,5 +1,8 @@
 project_id = "jhcbvppqhmedikzuwats"
 
+[functions.img-to-png]
+verify_jwt = true
+
 [functions.create-character-sheet]
 verify_jwt = true
 

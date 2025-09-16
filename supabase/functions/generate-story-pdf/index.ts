@@ -119,9 +119,58 @@ serve(async (req) => {
   }
 });
 
+// Convert WebP images to PNG for PDF compatibility
+async function convertWebPImagesToPNG(pages: Array<any>): Promise<Array<any>> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  
+  const convertedPages = [];
+  
+  for (const page of pages) {
+    let convertedPage = { ...page };
+    
+    if (page.image_url && page.image_url.includes("data:image/webp;base64,")) {
+      console.log(`🔄 Converting WebP image for page ${page.page_number}`);
+      
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/img-to-png`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ dataUrl: page.image_url })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            convertedPage.image_url = result.dataUrl;
+            console.log(`✅ Successfully converted WebP to PNG for page ${page.page_number}`);
+          } else {
+            console.warn(`⚠️ Failed to convert WebP for page ${page.page_number}:`, result.error);
+          }
+        } else {
+          console.warn(`⚠️ Conversion service failed for page ${page.page_number}: ${response.status}`);
+        }
+      } catch (error: any) {
+        console.error(`💥 Error converting WebP for page ${page.page_number}:`, error.message);
+      }
+    }
+    
+    convertedPages.push(convertedPage);
+  }
+  
+  return convertedPages;
+}
+
 async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   const startTime = Date.now();
   console.log(`Starting PDF generation with images for ${pages.length} pages`);
+  
+  // Convert WebP images to PNG before processing
+  const processedPages = await convertWebPImagesToPNG(pages);
+  console.log("WebP conversion complete, proceeding with PDF generation");
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -147,7 +196,7 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   }
 
   // Process pages with images - optimized to avoid resource limits
-  const limitedPages = pages.slice(0, 8); // Limit to 8 pages to avoid timeouts
+  const limitedPages = processedPages.slice(0, 8); // Limit to 8 pages to avoid timeouts
   
   for (let i = 0; i < limitedPages.length; i++) {
     const p = limitedPages[i];
