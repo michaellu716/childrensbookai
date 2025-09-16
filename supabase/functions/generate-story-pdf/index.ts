@@ -119,58 +119,9 @@ serve(async (req) => {
   }
 });
 
-// Convert WebP images to PNG for PDF compatibility
-async function convertWebPImagesToPNG(pages: Array<any>): Promise<Array<any>> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  
-  const convertedPages = [];
-  
-  for (const page of pages) {
-    let convertedPage = { ...page };
-    
-    if (page.image_url && page.image_url.includes("data:image/webp;base64,")) {
-      console.log(`🔄 Converting WebP image for page ${page.page_number}`);
-      
-      try {
-        const response = await fetch(`${supabaseUrl}/functions/v1/img-to-png`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({ dataUrl: page.image_url })
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            convertedPage.image_url = result.dataUrl;
-            console.log(`✅ Successfully converted WebP to PNG for page ${page.page_number}`);
-          } else {
-            console.warn(`⚠️ Failed to convert WebP for page ${page.page_number}:`, result.error);
-          }
-        } else {
-          console.warn(`⚠️ Conversion service failed for page ${page.page_number}: ${response.status}`);
-        }
-      } catch (error: any) {
-        console.error(`💥 Error converting WebP for page ${page.page_number}:`, error.message);
-      }
-    }
-    
-    convertedPages.push(convertedPage);
-  }
-  
-  return convertedPages;
-}
-
 async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   const startTime = Date.now();
   console.log(`Starting PDF generation with images for ${pages.length} pages`);
-  
-  // Convert WebP images to PNG before processing
-  const processedPages = await convertWebPImagesToPNG(pages);
-  console.log("WebP conversion complete, proceeding with PDF generation");
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -195,12 +146,10 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     }
   }
 
-  // Process pages with images - optimized to avoid resource limits
-  const limitedPages = processedPages.slice(0, 8); // Limit to 8 pages to avoid timeouts
-  
-  for (let i = 0; i < limitedPages.length; i++) {
-    const p = limitedPages[i];
-    console.log(`Processing page ${p.page_number} (${i + 1}/${limitedPages.length})`);
+  // Process pages with images directly
+  for (let i = 0; i < pages.length && i < 10; i++) { // Limit to 10 pages to avoid timeouts
+    const p = pages[i];
+    console.log(`Processing page ${p.page_number} (${i + 1}/${Math.min(pages.length, 10)})`);
     
     const page = pdfDoc.addPage([612, 792]);
     const { width, height } = page.getSize();
@@ -385,58 +334,18 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
         return null;
       }
       
-      // Convert WebP to PNG if needed - use server-side conversion for reliability
-      if (isWebP) {
-        console.log('🔄 Converting WebP to PNG via img-to-png service');
-        
-        // Convert to base64 for the conversion service
-        const base64Data = btoa(String.fromCharCode(...imageBytes));
-        const dataUrl = `data:image/webp;base64,${base64Data}`;
-        
-        try {
-          const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-          const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-          
-          const response = await fetch(`${supabaseUrl}/functions/v1/img-to-png`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseServiceKey}`,
-            },
-            body: JSON.stringify({ dataUrl })
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            if (result.success && result.dataUrl) {
-              // Convert back to bytes
-              const [, convertedBase64] = result.dataUrl.split(',');
-              imageBytes = base64ToBytes(convertedBase64);
-              console.log(`✅ WebP converted to PNG: ${imageBytes.length} bytes`);
-            } else {
-              console.error('❌ img-to-png conversion failed:', result.error);
-              return null;
-            }
-          } else {
-            console.error('❌ img-to-png service failed:', response.status);
-            return null;
-          }
-        } catch (conversionError: any) {
-          console.error('💥 WebP conversion error:', conversionError.message);
-          return null;
-        }
-      }
-      
-      // Try embedding as PNG first (since we may have converted), then JPEG
+      // Try to embed directly without conversion - avoid stack overflow
       try {
         const img = await pdfDoc.embedPng(imageBytes);
+        console.log(`✅ Successfully embedded as PNG`);
         return { image: img, width: img.width, height: img.height };
       } catch (pngError) {
         try {
           const img = await pdfDoc.embedJpg(imageBytes);
+          console.log(`✅ Successfully embedded as JPEG`);
           return { image: img, width: img.width, height: img.height };
         } catch (jpegError) {
-          console.warn(`Failed to embed as PNG or JPEG: ${pngError}, ${jpegError}`);
+          console.warn(`Could not embed image - unsupported format or corrupted data`);
           return null;
         }
       }
