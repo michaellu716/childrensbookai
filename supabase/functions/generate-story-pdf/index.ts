@@ -121,7 +121,7 @@ serve(async (req) => {
 
 async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   const startTime = Date.now();
-  console.log(`Starting optimized PDF generation for ${pages.length} pages`);
+  console.log(`Starting lightweight PDF generation for ${pages.length} pages`);
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -144,10 +144,15 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     if (childName) {
       page.drawText(childName, { x: 50, y: height - 140, size: 14, font, color: rgb(0.2, 0.2, 0.2) });
     }
+    
+    // Note about images
+    page.drawText('Note: This PDF contains text only. Images are available in the digital version.', {
+      x: 50, y: height - 180, size: 10, font, color: rgb(0.5, 0.5, 0.5)
+    });
   }
 
-  // Process pages with images - optimized for speed
-  const limitedPages = pages.slice(0, 8); // Reduce to 8 pages max for faster processing
+  // Process pages - text only for speed and reliability
+  const limitedPages = pages.slice(0, 10); // Limit to 10 pages
   
   for (let i = 0; i < limitedPages.length; i++) {
     const p = limitedPages[i];
@@ -167,70 +172,23 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     });
     cursorY -= 40;
 
-    // Add image if available - with faster processing
-    if (p.image_url) {
-      console.log(`🖼️ Processing image for page ${p.page_number}: ${p.image_url}`);
-      const imageResult = await embedImageFast(pdfDoc, p.image_url);
-      if (imageResult) {
-        console.log(`✅ Image successfully processed for page ${p.page_number}, dimensions: ${imageResult.width}x${imageResult.height}`);
-        const { image, width: imgWidth, height: imgHeight } = imageResult;
-        
-        // Calculate smaller image dimensions for faster rendering
-        const maxImageWidth = width - margin * 2;
-        const maxImageHeight = 250; // Smaller than before
-        
-        let drawWidth = imgWidth;
-        let drawHeight = imgHeight;
-        
-        // Scale image to fit (simplified calculation)
-        const widthScale = maxImageWidth / drawWidth;
-        const heightScale = maxImageHeight / drawHeight;
-        const scale = Math.min(widthScale, heightScale, 1); // Don't upscale
-        
-        drawWidth = drawWidth * scale;
-        drawHeight = drawHeight * scale;
-        
-        console.log(`📏 Scaled image dimensions: ${drawWidth}x${drawHeight} (scale: ${scale})`);
-        
-        // Center the image horizontally
-        const imageX = margin + (maxImageWidth - drawWidth) / 2;
-        const imageY = cursorY - drawHeight;
-        
-        page.drawImage(image, {
-          x: imageX,
-          y: imageY,
-          width: drawWidth,
-          height: drawHeight,
-        });
-        
-        console.log(`🎯 Image drawn at position: ${imageX}, ${imageY}`);
-        cursorY = imageY - 15; // Less spacing
-      } else {
-        console.error(`❌ Failed to process image for page ${p.page_number}: ${p.image_url}`);
-        // More informative message about WebP limitation
-        if (p.image_url && p.image_url.includes('.webp')) {
-          page.drawText('[WebP format - PDF conversion not supported]', {
-            x: margin, y: cursorY - 15, size: 9, font, color: rgb(0.7, 0.7, 0.7)
-          });
-        } else {
-          page.drawText('[Image could not be loaded]', {
-            x: margin, y: cursorY - 15, size: 9, font, color: rgb(0.7, 0.7, 0.7)
-          });
-        }
-        cursorY -= 30;
-      }
-    } else {
-      console.log(`ℹ️ No image URL for page ${p.page_number}`);
-    }
-
-    // Add text content
+    // Add text content only
     if (p.text_content) {
-      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 18);
+      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 20);
+    }
+    
+    // Simple image placeholder
+    if (p.image_url) {
+      cursorY -= 30;
+      page.drawText('[Illustration would appear here - see digital version for images]', {
+        x: margin, y: cursorY, size: 10, font, color: rgb(0.6, 0.6, 0.6)
+      });
+      cursorY -= 20;
     }
   }
 
   const pdfBytes = await pdfDoc.save();
-  console.log(`Optimized PDF generation completed in ${Date.now() - startTime}ms`);
+  console.log(`Lightweight PDF generation completed in ${Date.now() - startTime}ms`);
   return pdfBytes;
 }
 
