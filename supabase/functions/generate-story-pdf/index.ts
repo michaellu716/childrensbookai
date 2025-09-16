@@ -342,7 +342,15 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
         if (!base64Data) return null;
         
         imageBytes = base64ToBytes(base64Data);
-        isWebP = header.includes('webp');
+        
+        // Better WebP detection for base64 data URLs
+        isWebP = header.includes('webp') || header.includes('application/octet-stream');
+        
+        // If octet-stream, check the actual bytes for WebP signature
+        if (header.includes('application/octet-stream') && imageBytes.length >= 12) {
+          const isWebPSignature = imageBytes[8] === 0x57 && imageBytes[9] === 0x45 && imageBytes[10] === 0x42 && imageBytes[11] === 0x50;
+          isWebP = isWebP || isWebPSignature;
+        }
         
         console.log(`Processing base64 image: ${imageBytes.length} bytes, WebP: ${isWebP}`);
       } else {
@@ -357,9 +365,9 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
           return null;
         }
         
-        // Check content length
+        // Check content length - more reasonable limit for story images
         const contentLength = response.headers.get('content-length');
-        if (contentLength && parseInt(contentLength) > 800 * 1024) {
+        if (contentLength && parseInt(contentLength) > 5 * 1024 * 1024) {
           console.warn(`Remote image too large: ${contentLength} bytes`);
           return null;
         }
@@ -370,23 +378,53 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
         console.log(`Processing remote image: ${imageBytes.length} bytes, WebP: ${isWebP}`);
       }
       
-      // Strict size limit for memory management
-      const maxSize = 800 * 1024; // 800KB max
+      // More reasonable size limit for story images
+      const maxSize = 5 * 1024 * 1024; // 5MB max to accommodate story images
       if (imageBytes.length > maxSize) {
         console.warn(`Image too large: ${imageBytes.length} bytes, max: ${maxSize}`);
         return null;
       }
       
-      // Convert WebP to PNG if needed
+      // Convert WebP to PNG if needed - use server-side conversion for reliability
       if (isWebP) {
-        console.log('🔄 Converting WebP to PNG for PDF compatibility');
-        const pngBytes = await convertWebPToPng(imageBytes);
-        if (!pngBytes) {
-          console.log('❌ Failed to convert WebP to PNG');
+        console.log('🔄 Converting WebP to PNG via img-to-png service');
+        
+        // Convert to base64 for the conversion service
+        const base64Data = btoa(String.fromCharCode(...imageBytes));
+        const dataUrl = `data:image/webp;base64,${base64Data}`;
+        
+        try {
+          const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+          const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+          
+          const response = await fetch(`${supabaseUrl}/functions/v1/img-to-png`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({ dataUrl })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.dataUrl) {
+              // Convert back to bytes
+              const [, convertedBase64] = result.dataUrl.split(',');
+              imageBytes = base64ToBytes(convertedBase64);
+              console.log(`✅ WebP converted to PNG: ${imageBytes.length} bytes`);
+            } else {
+              console.error('❌ img-to-png conversion failed:', result.error);
+              return null;
+            }
+          } else {
+            console.error('❌ img-to-png service failed:', response.status);
+            return null;
+          }
+        } catch (conversionError: any) {
+          console.error('💥 WebP conversion error:', conversionError.message);
           return null;
         }
-        imageBytes = pngBytes;
-        console.log(`✅ WebP converted to PNG: ${imageBytes.length} bytes`);
       }
       
       // Try embedding as PNG first (since we may have converted), then JPEG
