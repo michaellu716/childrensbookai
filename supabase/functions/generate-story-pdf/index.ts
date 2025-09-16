@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { storyId } = await req.json();
+    const { storyId, pageOffset = 0, pageLimit = 3 } = await req.json();
     if (!storyId) {
       return new Response(JSON.stringify({ error: "Missing storyId" }), {
         status: 400,
@@ -23,7 +23,7 @@ serve(async (req) => {
       });
     }
 
-    console.log("generate-story-pdf: Processing story:", storyId);
+    console.log(`generate-story-pdf: Processing story: ${storyId}, offset: ${pageOffset}, limit: ${pageLimit}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -51,8 +51,8 @@ serve(async (req) => {
       });
     }
 
-    // Fetch pages
-    const { data: pages, error: pagesError } = await supabaseUser
+    // Fetch pages with pagination
+    const { data: allPages, error: pagesError } = await supabaseUser
       .from("story_pages")
       .select("id, page_number, text_content, image_url")
       .eq("story_id", storyId)
@@ -66,12 +66,21 @@ serve(async (req) => {
       });
     }
 
-    // Build PDF
-    const pdfBytes = await buildPdf(story, pages || []);
+    // Apply pagination
+    const totalPages = allPages?.length || 0;
+    const paginatedPages = allPages?.slice(pageOffset, pageOffset + pageLimit) || [];
+    const hasMorePages = pageOffset + pageLimit < totalPages;
+    
+    console.log(`Processing ${paginatedPages.length} pages (${pageOffset + 1}-${pageOffset + paginatedPages.length} of ${totalPages})`);
 
-    // Upload to storage with a structured path
+    // Build PDF with paginated pages
+    const pdfBytes = await buildPdf(story, paginatedPages, pageOffset === 0);
+
+    // Upload to storage with pagination info
     const safeTitle = String(story.title || 'story').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = `${safeTitle}_${Date.now()}.pdf`;
+    const filename = pageOffset === 0 
+      ? `${safeTitle}_${Date.now()}.pdf`
+      : `${safeTitle}_${Date.now()}_part${Math.floor(pageOffset / pageLimit) + 1}.pdf`;
     const storagePath = `${story.user_id}/${story.id}/${filename}`;
 
     const { error: uploadError } = await supabaseService.storage
@@ -103,11 +112,24 @@ serve(async (req) => {
       });
     }
 
-    // Optionally store the storage path for later use
-    await supabaseService.from("stories").update({ pdf_url: storagePath }).eq("id", storyId);
+    // Update story with pdf_url only for the first page batch
+    if (pageOffset === 0) {
+      await supabaseService.from("stories").update({ pdf_url: storagePath }).eq("id", storyId);
+    }
 
     return new Response(
-      JSON.stringify({ success: true, pdfUrl: signed?.signedUrl, filename }),
+      JSON.stringify({ 
+        success: true, 
+        pdfUrl: signed?.signedUrl, 
+        filename,
+        pagination: {
+          pageOffset,
+          pageLimit,
+          totalPages,
+          hasMorePages,
+          processedPages: paginatedPages.length
+        }
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
@@ -119,16 +141,16 @@ serve(async (req) => {
   }
 });
 
-async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
+async function buildPdf(story: any, pages: Array<any>, includeCover = true): Promise<Uint8Array> {
   const startTime = Date.now();
-  console.log(`Starting PDF generation with images for ${pages.length} pages`);
+  console.log(`Starting PDF generation with images for ${pages.length} pages (cover: ${includeCover})`);
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  // Cover page
-  {
+  // Cover page (only for first batch)
+  if (includeCover) {
     const page = pdfDoc.addPage([612, 792]); // Letter size
     const { width, height } = page.getSize();
 
@@ -146,10 +168,10 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     }
   }
 
-  // Process pages with images directly
-  for (let i = 0; i < pages.length && i < 10; i++) { // Limit to 10 pages to avoid timeouts
+  // Process pages in current batch
+  for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
-    console.log(`Processing page ${p.page_number} (${i + 1}/${Math.min(pages.length, 10)})`);
+    console.log(`Processing page ${p.page_number} (${i + 1}/${pages.length})`);
     
     const page = pdfDoc.addPage([612, 792]);
     const { width, height } = page.getSize();
