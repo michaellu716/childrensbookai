@@ -42,10 +42,16 @@ const fetchPaginatedCharacters = async (
     query = query.eq('user_id', userId);
   }
 
-  // Add search functionality
+  // Optimized search using full-text search index
   if (searchQuery && searchQuery.trim()) {
-    const searchTerm = searchQuery.toLowerCase();
-    query = query.or(`name.ilike.%${searchTerm}%,hair_color.ilike.%${searchTerm}%,eye_color.ilike.%${searchTerm}%,typical_outfit.ilike.%${searchTerm}%`);
+    const searchTerm = searchQuery.replace(/[^\w\s]/g, '').trim(); // Sanitize input
+    if (searchTerm) {
+      // Use the new GIN index for full-text search
+      query = query.textSearch('name,hair_color,eye_color,typical_outfit', `'${searchTerm}':*`, {
+        type: 'websearch',
+        config: 'english'
+      });
+    }
   }
 
   // Apply pagination and sorting

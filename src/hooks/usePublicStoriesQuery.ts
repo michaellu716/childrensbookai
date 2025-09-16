@@ -13,15 +13,15 @@ export interface PublicStory {
 }
 
 const fetchPublicStoriesOptimized = async (): Promise<PublicStory[]> => {
-  // Secure query - only fetch non-sensitive data for public stories
+  // Optimized query using partial index for public completed stories
   const { data: storiesData, error } = await supabase
     .from('stories')
     .select('id, title, themes, art_style, length, created_at, likes')
     .eq('is_public', true)
-    .eq('status', 'completed') // Only show completed public stories
+    .eq('status', 'completed') // Uses idx_stories_public_completed partial index
     .order('likes', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(100); // Limit for performance
+    .limit(50); // Reduced limit for better performance
 
   if (error) throw error;
 

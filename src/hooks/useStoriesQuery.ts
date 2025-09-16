@@ -19,13 +19,13 @@ export interface Story {
 }
 
 const fetchStoriesOptimized = async (): Promise<Story[]> => {
-  // Fast query - get stories only, no joins to avoid timeouts
+  // Optimized query using new composite index for sorting
   const { data: storiesData, error } = await supabase
     .from('stories')
     .select('id, title, child_name, child_age, themes, art_style, length, created_at, status, updated_at, user_id, likes, is_public')
     .order('likes', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(100); // Limit initial load for performance
+    .limit(50); // Reduced limit for better performance
 
   if (error) throw error;
 
