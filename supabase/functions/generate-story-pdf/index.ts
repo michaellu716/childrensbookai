@@ -241,83 +241,117 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   return pdfBytes;
 }
 
-// Optimized image embedding function with better resource management
+// WebP to PNG conversion function
+async function convertWebPToPng(webpData: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    // Create a canvas to convert WebP to PNG
+    const canvas = new OffscreenCanvas(800, 600);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Create blob from WebP data
+    const blob = new Blob([webpData], { type: 'image/webp' });
+    
+    // Create image bitmap from blob
+    const imageBitmap = await createImageBitmap(blob);
+    
+    // Resize canvas to match image dimensions
+    canvas.width = imageBitmap.width;
+    canvas.height = imageBitmap.height;
+    
+    // Draw image to canvas
+    ctx.drawImage(imageBitmap, 0, 0);
+    
+    // Convert canvas to PNG blob
+    const pngBlob = await canvas.convertToBlob({ type: 'image/png' });
+    
+    // Convert blob to Uint8Array
+    const arrayBuffer = await pngBlob.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+  } catch (error) {
+    console.log(`❌ Error converting WebP to PNG: ${error}`);
+    return null;
+  }
+}
+
+// Optimized image embedding function with WebP conversion
 async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
   try {
-    // Skip WebP images entirely - they're not supported
-    if (imageUrl.includes('.webp')) {
-      console.log(`⚠️ Skipping WebP image (not supported): ${imageUrl}`);
-      return null;
-    }
+    console.log(`🖼️ Processing image: ${imageUrl.substring(0, 100)}...`);
     
     // Aggressive timeout for faster failures
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
     
     try {
+      let imageBytes: Uint8Array;
+      let isWebP = false;
+      
       // Handle base64 data URLs
       if (imageUrl.startsWith('data:image/')) {
         const [header, base64Data] = imageUrl.split(',');
         if (!base64Data) return null;
         
-        const bytes = base64ToBytes(base64Data);
+        imageBytes = base64ToBytes(base64Data);
+        isWebP = header.includes('webp');
         
-        // Strict size limit for memory management
-        const maxSize = 800 * 1024; // 800KB max
-        if (bytes.length > maxSize) {
-          console.warn(`Image too large: ${bytes.length} bytes, max: ${maxSize}`);
+        console.log(`Processing base64 image: ${imageBytes.length} bytes, WebP: ${isWebP}`);
+      } else {
+        // Handle remote images
+        const response = await fetch(imageUrl, { 
+          signal: controller.signal,
+          headers: { 'User-Agent': 'StoryPDF/1.0' }
+        });
+        
+        if (!response.ok) {
+          console.warn(`Fetch failed: ${response.status} for ${imageUrl}`);
           return null;
         }
         
-        console.log(`Processing base64 image: ${bytes.length} bytes`);
-        
-        // Try embedding based on header
-        if (header.includes('jpeg') || header.includes('jpg')) {
-          const img = await pdfDoc.embedJpg(bytes);
-          return { image: img, width: img.width, height: img.height };
-        } else if (header.includes('png')) {
-          const img = await pdfDoc.embedPng(bytes);
-          return { image: img, width: img.width, height: img.height };
+        // Check content length
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength) > 800 * 1024) {
+          console.warn(`Remote image too large: ${contentLength} bytes`);
+          return null;
         }
         
-        console.warn(`Unsupported data URL format: ${header}`);
+        imageBytes = new Uint8Array(await response.arrayBuffer());
+        isWebP = imageUrl.includes('.webp') || (imageBytes[8] === 0x57 && imageBytes[9] === 0x45 && imageBytes[10] === 0x42 && imageBytes[11] === 0x50);
+        
+        console.log(`Processing remote image: ${imageBytes.length} bytes, WebP: ${isWebP}`);
+      }
+      
+      // Strict size limit for memory management
+      const maxSize = 800 * 1024; // 800KB max
+      if (imageBytes.length > maxSize) {
+        console.warn(`Image too large: ${imageBytes.length} bytes, max: ${maxSize}`);
         return null;
       }
       
-      // Handle remote images
-      const response = await fetch(imageUrl, { 
-        signal: controller.signal,
-        headers: { 'User-Agent': 'StoryPDF/1.0' }
-      });
-      
-      if (!response.ok) {
-        console.warn(`Fetch failed: ${response.status} for ${imageUrl}`);
-        return null;
+      // Convert WebP to PNG if needed
+      if (isWebP) {
+        console.log('🔄 Converting WebP to PNG for PDF compatibility');
+        const pngBytes = await convertWebPToPng(imageBytes);
+        if (!pngBytes) {
+          console.log('❌ Failed to convert WebP to PNG');
+          return null;
+        }
+        imageBytes = pngBytes;
+        console.log(`✅ WebP converted to PNG: ${imageBytes.length} bytes`);
       }
       
-      // Check content length
-      const contentLength = response.headers.get('content-length');
-      if (contentLength && parseInt(contentLength) > 800 * 1024) {
-        console.warn(`Remote image too large: ${contentLength} bytes`);
-        return null;
-      }
-      
-      const imageBytes = new Uint8Array(await response.arrayBuffer());
-      
-      if (imageBytes.length > 800 * 1024) {
-        console.warn(`Downloaded image too large: ${imageBytes.length} bytes`);
-        return null;
-      }
-      
-      console.log(`Processing remote image: ${imageBytes.length} bytes`);
-      
-      // Try JPEG first, then PNG
+      // Try embedding as PNG first (since we may have converted), then JPEG
       try {
-        const img = await pdfDoc.embedJpg(imageBytes);
-        return { image: img, width: img.width, height: img.height };
-      } catch {
         const img = await pdfDoc.embedPng(imageBytes);
         return { image: img, width: img.width, height: img.height };
+      } catch (pngError) {
+        try {
+          const img = await pdfDoc.embedJpg(imageBytes);
+          return { image: img, width: img.width, height: img.height };
+        } catch (jpegError) {
+          console.warn(`Failed to embed as PNG or JPEG: ${pngError}, ${jpegError}`);
+          return null;
+        }
       }
       
     } finally {
