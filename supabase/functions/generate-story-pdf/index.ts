@@ -202,8 +202,8 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
         
         cursorY = imageY - 15; // Less spacing
       } else {
-        // Quick fallback for failed images
-        page.drawText('[Image unavailable]', {
+        // Better fallback message for unsupported image formats
+        page.drawText('[WebP images not supported in PDF]', {
           x: margin, y: cursorY - 15, size: 9, font, color: rgb(0.7, 0.7, 0.7)
         });
         cursorY -= 30;
@@ -223,9 +223,17 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
 
 async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
   try {
+    console.log(`Attempting to embed image: ${imageUrl}`);
+    
+    // Check if image is WebP format (not supported by pdf-lib)
+    if (imageUrl.includes('.webp')) {
+      console.warn(`WebP format not supported by PDF generator: ${imageUrl}`);
+      return null;
+    }
+    
     // More aggressive timeout and size limits for speed
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500); // Shorter timeout
+    const timeoutId = setTimeout(() => controller.abort(), 2500); // Increased timeout slightly
     
     try {
       // Handle data URLs with stricter limits
@@ -234,13 +242,13 @@ async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ 
         if (!base64Data) return null;
         
         const bytes = base64ToBytes(base64Data);
-        const maxSize = 512 * 1024; // Reduced to 512KB for speed
+        const maxSize = 1024 * 1024; // Increased to 1MB for better quality
         if (bytes.length > maxSize) {
           console.warn(`Image too large for fast processing: ${bytes.length} bytes`);
           return null;
         }
         
-        // Only handle JPEG for speed (most story images are JPEG)
+        // Handle supported formats
         if (header.includes('jpeg') || header.includes('jpg')) {
           const img = await pdfDoc.embedJpg(bytes);
           return { image: img, width: img.width, height: img.height };
@@ -248,6 +256,7 @@ async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ 
           const img = await pdfDoc.embedPng(bytes);
           return { image: img, width: img.width, height: img.height };
         }
+        console.warn(`Unsupported data URL format: ${header}`);
         return null;
       }
       
@@ -257,27 +266,36 @@ async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ 
         headers: { 'User-Agent': 'PDF-Generator/1.0' }
       });
       
-      if (!res.ok) return null;
+      if (!res.ok) {
+        console.warn(`Image fetch failed: ${res.status} for ${imageUrl}`);
+        return null;
+      }
       
       // Check size before downloading
       const contentLength = res.headers.get('content-length');
-      if (contentLength && parseInt(contentLength) > 512 * 1024) {
+      if (contentLength && parseInt(contentLength) > 1024 * 1024) {
         console.warn(`Remote image too large: ${contentLength} bytes`);
         return null;
       }
       
       const buf = new Uint8Array(await res.arrayBuffer());
-      if (buf.length > 512 * 1024) return null;
+      if (buf.length > 1024 * 1024) {
+        console.warn(`Downloaded image too large: ${buf.length} bytes`);
+        return null;
+      }
       
-      // Try JPEG first (most common), then PNG
+      // Try JPEG first, then PNG
       try {
         const img = await pdfDoc.embedJpg(buf);
+        console.log(`Successfully embedded JPEG image from ${imageUrl}`);
         return { image: img, width: img.width, height: img.height };
-      } catch {
+      } catch (jpgError) {
         try {
           const img = await pdfDoc.embedPng(buf);
+          console.log(`Successfully embedded PNG image from ${imageUrl}`);
           return { image: img, width: img.width, height: img.height };
-        } catch {
+        } catch (pngError) {
+          console.warn(`Failed to embed as JPEG or PNG: ${jpgError.message}, ${pngError.message}`);
           return null;
         }
       }
@@ -285,7 +303,7 @@ async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ 
       clearTimeout(timeoutId);
     }
   } catch (e: any) {
-    console.warn(`Fast image embed failed: ${e.message}`);
+    console.warn(`Fast image embed failed for ${imageUrl}: ${e.message}`);
     return null;
   }
 }
