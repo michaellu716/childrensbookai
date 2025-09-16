@@ -121,7 +121,7 @@ serve(async (req) => {
 
 async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   const startTime = Date.now();
-  console.log(`Starting lightweight PDF generation for ${pages.length} pages`);
+  console.log(`Starting PDF generation with images for ${pages.length} pages`);
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -144,18 +144,14 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     if (childName) {
       page.drawText(childName, { x: 50, y: height - 140, size: 14, font, color: rgb(0.2, 0.2, 0.2) });
     }
-    
-    // Note about images
-    page.drawText('Note: This PDF contains text only. Images are available in the digital version.', {
-      x: 50, y: height - 180, size: 10, font, color: rgb(0.5, 0.5, 0.5)
-    });
   }
 
-  // Process pages - text only for speed and reliability
-  const limitedPages = pages.slice(0, 10); // Limit to 10 pages
+  // Process pages with images - optimized to avoid resource limits
+  const limitedPages = pages.slice(0, 8); // Limit to 8 pages to avoid timeouts
   
   for (let i = 0; i < limitedPages.length; i++) {
     const p = limitedPages[i];
+    console.log(`Processing page ${p.page_number} (${i + 1}/${limitedPages.length})`);
     
     const page = pdfDoc.addPage([612, 792]);
     const { width, height } = page.getSize();
@@ -172,60 +168,110 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     });
     cursorY -= 40;
 
-    // Add text content only
-    if (p.text_content) {
-      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 20);
-    }
-    
-    // Simple image placeholder
+    // Process image first if available
     if (p.image_url) {
-      cursorY -= 30;
-      page.drawText('[Illustration would appear here - see digital version for images]', {
-        x: margin, y: cursorY, size: 10, font, color: rgb(0.6, 0.6, 0.6)
-      });
-      cursorY -= 20;
+      console.log(`🖼️ Processing image for page ${p.page_number}: ${p.image_url.substring(0, 100)}...`);
+      
+      try {
+        const imageResult = await embedImageOptimized(pdfDoc, p.image_url);
+        if (imageResult) {
+          const { image, width: imgWidth, height: imgHeight } = imageResult;
+          
+          // Calculate smaller image dimensions to reduce memory usage
+          const maxImageWidth = width - margin * 2;
+          const maxImageHeight = 200; // Reduced size for better performance
+          
+          let drawWidth = imgWidth;
+          let drawHeight = imgHeight;
+          
+          // Scale image to fit
+          const widthScale = maxImageWidth / drawWidth;
+          const heightScale = maxImageHeight / drawHeight;
+          const scale = Math.min(widthScale, heightScale, 0.8); // Max 80% of original to save memory
+          
+          drawWidth = drawWidth * scale;
+          drawHeight = drawHeight * scale;
+          
+          // Center the image horizontally
+          const imageX = margin + (maxImageWidth - drawWidth) / 2;
+          const imageY = cursorY - drawHeight;
+          
+          page.drawImage(image, {
+            x: imageX,
+            y: imageY,
+            width: drawWidth,
+            height: drawHeight,
+          });
+          
+          console.log(`✅ Image embedded successfully at ${drawWidth}x${drawHeight}`);
+          cursorY = imageY - 20;
+        } else {
+          // Image failed - show informative placeholder
+          console.warn(`⚠️ Could not process image for page ${p.page_number}`);
+          cursorY -= 15;
+          if (p.image_url?.includes('.webp')) {
+            page.drawText('[WebP image - not supported in PDF format]', {
+              x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
+            });
+          } else {
+            page.drawText('[Image could not be processed]', {
+              x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
+            });
+          }
+          cursorY -= 25;
+        }
+      } catch (imageError: any) {
+        console.error(`💥 Image processing failed for page ${p.page_number}:`, imageError.message);
+        cursorY -= 15;
+        page.drawText('[Image processing failed]', {
+          x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
+        });
+        cursorY -= 25;
+      }
+    }
+
+    // Add text content
+    if (p.text_content) {
+      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 18);
     }
   }
 
   const pdfBytes = await pdfDoc.save();
-  console.log(`Lightweight PDF generation completed in ${Date.now() - startTime}ms`);
+  console.log(`PDF generation completed in ${Date.now() - startTime}ms`);
   return pdfBytes;
 }
 
-async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
+// Optimized image embedding function with better resource management
+async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
   try {
-    console.log(`🎯 Starting embedImageFast for: ${imageUrl}`);
-    
-    // Handle WebP images by converting them to JPEG
+    // Skip WebP images entirely - they're not supported
     if (imageUrl.includes('.webp')) {
-      console.log(`🔄 Detected WebP format, calling convertWebPToJpeg...`);
-      const result = await convertWebPToJpeg(pdfDoc, imageUrl);
-      if (result) {
-        console.log(`✅ WebP conversion successful, returning image`);
-      } else {
-        console.error(`❌ WebP conversion failed`);
-      }
-      return result;
+      console.log(`⚠️ Skipping WebP image (not supported): ${imageUrl}`);
+      return null;
     }
     
-    // More aggressive timeout and size limits for speed
+    // Aggressive timeout for faster failures
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500); // Increased timeout slightly
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     
     try {
-      // Handle data URLs with stricter limits
+      // Handle base64 data URLs
       if (imageUrl.startsWith('data:image/')) {
         const [header, base64Data] = imageUrl.split(',');
         if (!base64Data) return null;
         
         const bytes = base64ToBytes(base64Data);
-        const maxSize = 1024 * 1024; // Increased to 1MB for better quality
+        
+        // Strict size limit for memory management
+        const maxSize = 800 * 1024; // 800KB max
         if (bytes.length > maxSize) {
-          console.warn(`Image too large for fast processing: ${bytes.length} bytes`);
+          console.warn(`Image too large: ${bytes.length} bytes, max: ${maxSize}`);
           return null;
         }
         
-        // Handle supported formats
+        console.log(`Processing base64 image: ${bytes.length} bytes`);
+        
+        // Try embedding based on header
         if (header.includes('jpeg') || header.includes('jpg')) {
           const img = await pdfDoc.embedJpg(bytes);
           return { image: img, width: img.width, height: img.height };
@@ -233,120 +279,52 @@ async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ 
           const img = await pdfDoc.embedPng(bytes);
           return { image: img, width: img.width, height: img.height };
         }
+        
         console.warn(`Unsupported data URL format: ${header}`);
         return null;
       }
       
-      // Handle remote images with strict limits
-      const res = await fetch(imageUrl, { 
+      // Handle remote images
+      const response = await fetch(imageUrl, { 
         signal: controller.signal,
-        headers: { 'User-Agent': 'PDF-Generator/1.0' }
+        headers: { 'User-Agent': 'StoryPDF/1.0' }
       });
       
-      if (!res.ok) {
-        console.warn(`Image fetch failed: ${res.status} for ${imageUrl}`);
+      if (!response.ok) {
+        console.warn(`Fetch failed: ${response.status} for ${imageUrl}`);
         return null;
       }
       
-      // Check size before downloading
-      const contentLength = res.headers.get('content-length');
-      if (contentLength && parseInt(contentLength) > 1024 * 1024) {
+      // Check content length
+      const contentLength = response.headers.get('content-length');
+      if (contentLength && parseInt(contentLength) > 800 * 1024) {
         console.warn(`Remote image too large: ${contentLength} bytes`);
         return null;
       }
       
-      const buf = new Uint8Array(await res.arrayBuffer());
-      if (buf.length > 1024 * 1024) {
-        console.warn(`Downloaded image too large: ${buf.length} bytes`);
+      const imageBytes = new Uint8Array(await response.arrayBuffer());
+      
+      if (imageBytes.length > 800 * 1024) {
+        console.warn(`Downloaded image too large: ${imageBytes.length} bytes`);
         return null;
       }
+      
+      console.log(`Processing remote image: ${imageBytes.length} bytes`);
       
       // Try JPEG first, then PNG
       try {
-        const img = await pdfDoc.embedJpg(buf);
-        console.log(`Successfully embedded JPEG image from ${imageUrl}`);
+        const img = await pdfDoc.embedJpg(imageBytes);
         return { image: img, width: img.width, height: img.height };
-      } catch (jpgError) {
-        try {
-          const img = await pdfDoc.embedPng(buf);
-          console.log(`Successfully embedded PNG image from ${imageUrl}`);
-          return { image: img, width: img.width, height: img.height };
-        } catch (pngError) {
-          console.warn(`Failed to embed as JPEG or PNG: ${jpgError.message}, ${pngError.message}`);
-          return null;
-        }
+      } catch {
+        const img = await pdfDoc.embedPng(imageBytes);
+        return { image: img, width: img.width, height: img.height };
       }
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  } catch (e: any) {
-    console.warn(`Fast image embed failed for ${imageUrl}: ${e.message}`);
-    return null;
-  }
-}
-
-async function convertWebPToJpeg(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
-  try {
-    console.log(`🎯 Attempting to process WebP image: ${imageUrl}`);
-    
-    // Fetch the WebP image
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-    
-    try {
-      const response = await fetch(imageUrl, { 
-        signal: controller.signal,
-        headers: { 'User-Agent': 'PDF-Generator/1.0' }
-      });
-      
-      if (!response.ok) {
-        console.error(`❌ Failed to fetch WebP: ${response.status}`);
-        return null;
-      }
-      
-      const arrayBuffer = await response.arrayBuffer();
-      const imageBytes = new Uint8Array(arrayBuffer);
-      
-      console.log(`📊 WebP size: ${imageBytes.length} bytes`);
-      
-      if (imageBytes.length > 2 * 1024 * 1024) {
-        console.warn(`⚠️ Image too large: ${imageBytes.length} bytes`);
-        return null;
-      }
-      
-      // WebP magic bytes check
-      const isWebP = imageBytes[0] === 0x52 && imageBytes[1] === 0x49 && 
-                     imageBytes[2] === 0x46 && imageBytes[3] === 0x46 &&
-                     imageBytes[8] === 0x57 && imageBytes[9] === 0x45 && 
-                     imageBytes[10] === 0x42 && imageBytes[11] === 0x50;
-                     
-      if (!isWebP) {
-        console.log(`🔄 Not a WebP file, trying direct embed...`);
-        // Try direct embedding as JPEG/PNG
-        try {
-          const img = await pdfDoc.embedJpg(imageBytes);
-          console.log(`✅ Embedded as JPEG`);
-          return { image: img, width: img.width, height: img.height };
-        } catch {
-          try {
-            const img = await pdfDoc.embedPng(imageBytes);
-            console.log(`✅ Embedded as PNG`);
-            return { image: img, width: img.width, height: img.height };
-          } catch (e) {
-            console.error(`❌ Failed to embed: ${e.message}`);
-            return null;
-          }
-        }
-      }
-      
-      console.log(`⚠️ Confirmed WebP format - cannot process in PDF (pdf-lib limitation)`);
-      return null;
       
     } finally {
       clearTimeout(timeoutId);
     }
   } catch (error: any) {
-    console.error(`💥 WebP processing error: ${error.message}`);
+    console.warn(`Image processing failed: ${error.message}`);
     return null;
   }
 }
