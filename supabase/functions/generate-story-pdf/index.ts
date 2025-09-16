@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { storyId, pageOffset = 0, pageLimit = 3 } = await req.json();
+    const { storyId, pageOffset = 0, pageLimit = null, usePagination = false } = await req.json();
     if (!storyId) {
       return new Response(JSON.stringify({ error: "Missing storyId" }), {
         status: 400,
@@ -23,7 +23,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`generate-story-pdf: Processing story: ${storyId}, offset: ${pageOffset}, limit: ${pageLimit}`);
+    console.log(`generate-story-pdf: Processing story: ${storyId}, offset: ${pageOffset}, limit: ${pageLimit || 'all'}, pagination: ${usePagination}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -66,21 +66,30 @@ serve(async (req) => {
       });
     }
 
-    // Apply pagination
+    // Apply pagination only if explicitly requested
     const totalPages = allPages?.length || 0;
-    const paginatedPages = allPages?.slice(pageOffset, pageOffset + pageLimit) || [];
-    const hasMorePages = pageOffset + pageLimit < totalPages;
+    let paginatedPages, hasMorePages;
     
-    console.log(`Processing ${paginatedPages.length} pages (${pageOffset + 1}-${pageOffset + paginatedPages.length} of ${totalPages})`);
+    if (usePagination && pageLimit) {
+      // Use pagination - process only a subset of pages
+      paginatedPages = allPages?.slice(pageOffset, pageOffset + pageLimit) || [];
+      hasMorePages = pageOffset + pageLimit < totalPages;
+      console.log(`Processing ${paginatedPages.length} pages (${pageOffset + 1}-${pageOffset + paginatedPages.length} of ${totalPages}) with pagination`);
+    } else {
+      // Process all pages at once
+      paginatedPages = allPages || [];
+      hasMorePages = false;
+      console.log(`Processing all ${paginatedPages.length} pages in single PDF`);
+    }
 
-    // Build PDF with paginated pages
-    const pdfBytes = await buildPdf(story, paginatedPages, pageOffset === 0);
+    // Build PDF with selected pages
+    const pdfBytes = await buildPdf(story, paginatedPages, !usePagination || pageOffset === 0);
 
-    // Upload to storage with pagination info
+    // Upload to storage with appropriate filename
     const safeTitle = String(story.title || 'story').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = pageOffset === 0 
-      ? `${safeTitle}_${Date.now()}.pdf`
-      : `${safeTitle}_${Date.now()}_part${Math.floor(pageOffset / pageLimit) + 1}.pdf`;
+    const filename = usePagination && pageLimit && pageOffset > 0
+      ? `${safeTitle}_${Date.now()}_part${Math.floor(pageOffset / pageLimit) + 1}.pdf`
+      : `${safeTitle}_${Date.now()}.pdf`;
     const storagePath = `${story.user_id}/${story.id}/${filename}`;
 
     const { error: uploadError } = await supabaseService.storage
@@ -112,24 +121,31 @@ serve(async (req) => {
       });
     }
 
-    // Update story with pdf_url only for the first page batch
-    if (pageOffset === 0) {
+    // Update story with pdf_url for complete PDFs (not paginated parts)
+    if (!usePagination || pageOffset === 0) {
       await supabaseService.from("stories").update({ pdf_url: storagePath }).eq("id", storyId);
     }
 
+    // Prepare response based on pagination setting
+    const responseData: any = { 
+      success: true, 
+      pdfUrl: signed?.signedUrl, 
+      filename
+    };
+
+    // Only include pagination info if pagination is being used
+    if (usePagination && pageLimit) {
+      responseData.pagination = {
+        pageOffset,
+        pageLimit,
+        totalPages,
+        hasMorePages,
+        processedPages: paginatedPages.length
+      };
+    }
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        pdfUrl: signed?.signedUrl, 
-        filename,
-        pagination: {
-          pageOffset,
-          pageLimit,
-          totalPages,
-          hasMorePages,
-          processedPages: paginatedPages.length
-        }
-      }),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
