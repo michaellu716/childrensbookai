@@ -121,7 +121,7 @@ serve(async (req) => {
 
 async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
   const startTime = Date.now();
-  console.log(`Starting PDF generation with images for ${pages.length} pages`);
+  console.log(`Starting optimized PDF generation for ${pages.length} pages`);
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -146,8 +146,8 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     }
   }
 
-  // Process pages with images
-  const limitedPages = pages.slice(0, 12); // Limit pages
+  // Process pages with images - optimized for speed
+  const limitedPages = pages.slice(0, 8); // Reduce to 8 pages max for faster processing
   
   for (let i = 0; i < limitedPages.length; i++) {
     const p = limitedPages[i];
@@ -167,32 +167,27 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
     });
     cursorY -= 40;
 
-    // Add image if available
+    // Add image if available - with faster processing
     if (p.image_url) {
-      console.log(`Embedding image for page ${p.page_number}`);
-      const imageResult = await embedImageOptimized(pdfDoc, p.image_url);
+      console.log(`Processing image for page ${p.page_number}`);
+      const imageResult = await embedImageFast(pdfDoc, p.image_url);
       if (imageResult) {
         const { image, width: imgWidth, height: imgHeight } = imageResult;
         
-        // Calculate image dimensions to fit in page
+        // Calculate smaller image dimensions for faster rendering
         const maxImageWidth = width - margin * 2;
-        const maxImageHeight = 300; // Reserve space for text
+        const maxImageHeight = 250; // Smaller than before
         
         let drawWidth = imgWidth;
         let drawHeight = imgHeight;
         
-        // Scale image to fit
-        if (drawWidth > maxImageWidth) {
-          const scale = maxImageWidth / drawWidth;
-          drawWidth = maxImageWidth;
-          drawHeight = drawHeight * scale;
-        }
+        // Scale image to fit (simplified calculation)
+        const widthScale = maxImageWidth / drawWidth;
+        const heightScale = maxImageHeight / drawHeight;
+        const scale = Math.min(widthScale, heightScale, 1); // Don't upscale
         
-        if (drawHeight > maxImageHeight) {
-          const scale = maxImageHeight / drawHeight;
-          drawHeight = maxImageHeight;
-          drawWidth = drawWidth * scale;
-        }
+        drawWidth = drawWidth * scale;
+        drawHeight = drawHeight * scale;
         
         // Center the image horizontally
         const imageX = margin + (maxImageWidth - drawWidth) / 2;
@@ -205,95 +200,92 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
           height: drawHeight,
         });
         
-        cursorY = imageY - 20; // Add some space after image
+        cursorY = imageY - 15; // Less spacing
       } else {
-        // If image failed to load, show placeholder
-        page.drawText('[Image could not be loaded]', {
-          x: margin, y: cursorY - 20, size: 10, font, color: rgb(0.6, 0.6, 0.6)
+        // Quick fallback for failed images
+        page.drawText('[Image unavailable]', {
+          x: margin, y: cursorY - 15, size: 9, font, color: rgb(0.7, 0.7, 0.7)
         });
-        cursorY -= 40;
+        cursorY -= 30;
       }
     }
 
     // Add text content
     if (p.text_content) {
-      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 20);
+      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 18);
     }
   }
 
   const pdfBytes = await pdfDoc.save();
-  console.log(`Lightweight PDF generation completed in ${Date.now() - startTime}ms`);
+  console.log(`Optimized PDF generation completed in ${Date.now() - startTime}ms`);
   return pdfBytes;
 }
 
-async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
+async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
   try {
-    // Handle data URLs efficiently
-    if (imageUrl.startsWith('data:image/')) {
-      const [header, base64Data] = imageUrl.split(',');
-      if (!base64Data) return null;
-      
-      const bytes = base64ToBytes(base64Data);
-      const maxSize = 2 * 1024 * 1024; // 2MB limit
-      if (bytes.length > maxSize) {
-        console.warn(`Image too large: ${bytes.length} bytes, skipping`);
+    // More aggressive timeout and size limits for speed
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500); // Shorter timeout
+    
+    try {
+      // Handle data URLs with stricter limits
+      if (imageUrl.startsWith('data:image/')) {
+        const [header, base64Data] = imageUrl.split(',');
+        if (!base64Data) return null;
+        
+        const bytes = base64ToBytes(base64Data);
+        const maxSize = 512 * 1024; // Reduced to 512KB for speed
+        if (bytes.length > maxSize) {
+          console.warn(`Image too large for fast processing: ${bytes.length} bytes`);
+          return null;
+        }
+        
+        // Only handle JPEG for speed (most story images are JPEG)
+        if (header.includes('jpeg') || header.includes('jpg')) {
+          const img = await pdfDoc.embedJpg(bytes);
+          return { image: img, width: img.width, height: img.height };
+        } else if (header.includes('png')) {
+          const img = await pdfDoc.embedPng(bytes);
+          return { image: img, width: img.width, height: img.height };
+        }
         return null;
       }
       
-      if (header.includes('png')) {
-        const img = await pdfDoc.embedPng(bytes);
-        return { image: img, width: img.width, height: img.height };
-      } else if (header.includes('jpeg') || header.includes('jpg')) {
-        const img = await pdfDoc.embedJpg(bytes);
-        return { image: img, width: img.width, height: img.height };
-      }
-    }
-    
-    // Handle remote images with timeout and size limit
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
-    
-    try {
+      // Handle remote images with strict limits
       const res = await fetch(imageUrl, { 
         signal: controller.signal,
         headers: { 'User-Agent': 'PDF-Generator/1.0' }
       });
-      clearTimeout(timeoutId);
       
-      if (!res.ok) {
-        console.warn(`Image fetch failed: ${res.status}`);
-        return null;
-      }
+      if (!res.ok) return null;
       
+      // Check size before downloading
       const contentLength = res.headers.get('content-length');
-      if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) {
-        console.warn(`Image too large: ${contentLength} bytes`);
+      if (contentLength && parseInt(contentLength) > 512 * 1024) {
+        console.warn(`Remote image too large: ${contentLength} bytes`);
         return null;
       }
       
       const buf = new Uint8Array(await res.arrayBuffer());
-      if (buf.length > 2 * 1024 * 1024) {
-        console.warn(`Downloaded image too large: ${buf.length} bytes`);
-        return null;
-      }
+      if (buf.length > 512 * 1024) return null;
       
-      // Try PNG first, then JPG
+      // Try JPEG first (most common), then PNG
       try {
-        const img = await pdfDoc.embedPng(buf);
-        return { image: img, width: img.width, height: img.height };
-      } catch {
         const img = await pdfDoc.embedJpg(buf);
         return { image: img, width: img.width, height: img.height };
+      } catch {
+        try {
+          const img = await pdfDoc.embedPng(buf);
+          return { image: img, width: img.width, height: img.height };
+        } catch {
+          return null;
+        }
       }
     } finally {
       clearTimeout(timeoutId);
     }
   } catch (e: any) {
-    if (e.name === 'AbortError') {
-      console.warn('Image fetch timeout:', imageUrl);
-    } else {
-      console.warn('Image embed error:', e.message);
-    }
+    console.warn(`Fast image embed failed: ${e.message}`);
     return null;
   }
 }
