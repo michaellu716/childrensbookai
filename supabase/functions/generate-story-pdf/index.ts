@@ -224,7 +224,7 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
           });
           
           console.log(`✅ Image embedded successfully at ${drawWidth}x${drawHeight}`);
-          cursorY = imageY - 10;
+          cursorY = imageY - 30; // Increased spacing between image and text
         } else {
           // Image failed - show informative placeholder
           console.warn(`⚠️ Could not process image for page ${p.page_number}`);
@@ -238,7 +238,7 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
               x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
             });
           }
-          cursorY -= 15;
+          cursorY -= 25;
         }
       } catch (imageError: any) {
         console.error(`💥 Image processing failed for page ${p.page_number}:`, imageError.message);
@@ -246,13 +246,15 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
         page.drawText('[Image processing failed]', {
           x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
         });
-        cursorY -= 15;
+        cursorY -= 25;
       }
     }
 
-    // Add text content with reduced spacing
+    // Add text content with proper spacing and better readability
     if (p.text_content) {
-      cursorY = drawTextWrapped(page, String(p.text_content), font, 14, margin, cursorY, width - margin * 2, 16);
+      // Add extra space before text for better visual separation
+      cursorY -= 10;
+      cursorY = drawTextWrapped(page, String(p.text_content), font, 12, margin, cursorY, width - margin * 2, 18);
     }
   }
 
