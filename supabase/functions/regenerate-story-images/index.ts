@@ -151,12 +151,12 @@ async function regenerateImages(storyId: string, pages: any[], story: any, supab
       // Convert base64 to binary data for storage
       const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
       
-      // Upload to Supabase Storage instead of storing as base64 in database
-      const fileName = `story-${storyId}/page-${page.page_number}-${Date.now()}.webp`;
+      // Upload to Supabase Storage instead of storing as base64 in database (PNG format for PDF compatibility)
+      const fileName = `story-${storyId}/page-${page.page_number}-${Date.now()}.png`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('story-images')
         .upload(fileName, imageBuffer, {
-          contentType: 'image/webp',
+          contentType: 'image/png',
           cacheControl: '3600'
         });
 
