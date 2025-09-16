@@ -202,8 +202,8 @@ async function buildPdf(story: any, pages: Array<any>): Promise<Uint8Array> {
         
         cursorY = imageY - 15; // Less spacing
       } else {
-        // Better fallback message for unsupported image formats
-        page.drawText('[WebP images not supported in PDF]', {
+        // Better fallback message for failed image conversion
+        page.drawText('[Image could not be processed]', {
           x: margin, y: cursorY - 15, size: 9, font, color: rgb(0.7, 0.7, 0.7)
         });
         cursorY -= 30;
@@ -225,10 +225,10 @@ async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ 
   try {
     console.log(`Attempting to embed image: ${imageUrl}`);
     
-    // Check if image is WebP format (not supported by pdf-lib)
+    // Handle WebP images by converting them to JPEG
     if (imageUrl.includes('.webp')) {
-      console.warn(`WebP format not supported by PDF generator: ${imageUrl}`);
-      return null;
+      console.log(`Converting WebP image to JPEG: ${imageUrl}`);
+      return await convertWebPToJpeg(pdfDoc, imageUrl);
     }
     
     // More aggressive timeout and size limits for speed
@@ -304,6 +304,77 @@ async function embedImageFast(pdfDoc: PDFDocument, imageUrl: string): Promise<{ 
     }
   } catch (e: any) {
     console.warn(`Fast image embed failed for ${imageUrl}: ${e.message}`);
+    return null;
+  }
+}
+
+async function convertWebPToJpeg(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
+  try {
+    console.log(`Converting WebP to JPEG: ${imageUrl}`);
+    
+    // Fetch the WebP image
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    try {
+      const response = await fetch(imageUrl, { 
+        signal: controller.signal,
+        headers: { 'User-Agent': 'PDF-Generator/1.0' }
+      });
+      
+      if (!response.ok) {
+        console.warn(`Failed to fetch WebP image: ${response.status}`);
+        return null;
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const imageBytes = new Uint8Array(arrayBuffer);
+      
+      // Check size limit
+      if (imageBytes.length > 2 * 1024 * 1024) {
+        console.warn(`WebP image too large: ${imageBytes.length} bytes`);
+        return null;
+      }
+      
+      // Create a blob from the WebP data
+      const blob = new Blob([imageBytes], { type: 'image/webp' });
+      
+      // Create an ImageBitmap from the WebP blob
+      const imageBitmap = await createImageBitmap(blob);
+      
+      // Create an OffscreenCanvas to convert to JPEG
+      const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        console.warn('Failed to get canvas context');
+        return null;
+      }
+      
+      // Draw the image onto the canvas
+      ctx.drawImage(imageBitmap, 0, 0);
+      
+      // Convert to JPEG blob
+      const jpegBlob = await canvas.convertToBlob({ 
+        type: 'image/jpeg', 
+        quality: 0.85 // Good quality but compressed
+      });
+      
+      // Convert blob to array buffer
+      const jpegArrayBuffer = await jpegBlob.arrayBuffer();
+      const jpegBytes = new Uint8Array(jpegArrayBuffer);
+      
+      // Embed the JPEG in the PDF
+      const img = await pdfDoc.embedJpg(jpegBytes);
+      console.log(`Successfully converted WebP to JPEG and embedded in PDF`);
+      
+      return { image: img, width: img.width, height: img.height };
+      
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (error: any) {
+    console.warn(`WebP to JPEG conversion failed: ${error.message}`);
     return null;
   }
 }
