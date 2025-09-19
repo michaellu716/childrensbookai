@@ -166,109 +166,39 @@ const Library = () => {
 
   const handleDownloadPDF = async (storyId: string) => {
     try {
-      // First, get story details to check page count
-      const { data: storyData } = await supabase
-        .from('stories')
-        .select('id, title')
-        .eq('id', storyId)
-        .single();
-
-      const { data: pagesData } = await supabase
-        .from('story_pages')
-        .select('id')
-        .eq('story_id', storyId);
-
-      const pageCount = pagesData?.length || 0;
-      const storyTitle = storyData?.title || 'story';
+      toast.info('Generating complete PDF...');
       
-      if (pageCount > 8) {
-        toast.info(`Large story detected (${pageCount} pages). Generating PDF in optimized batches...`);
-        
-        // For large stories, use pagination
-        let pageOffset = 0;
-        const pageLimit = 3;
-        let hasMorePages = true;
-        const files: string[] = [];
-        let batchCount = 1;
-
-        while (hasMorePages) {
-          console.log(`Generating PDF batch ${batchCount} for story ${storyId}`);
-          
-          const { data, error } = await supabase.functions.invoke('generate-story-pdf', {
-            body: {
-              storyId,
-              pageOffset,
-              pageLimit
-            }
-          });
-
-          if (error) {
-            console.error('Error generating PDF batch:', error);
-            toast.error(`Failed to generate PDF batch ${batchCount}`);
-            break;
-          }
-          
-          if (data?.pdfUrl) {
-            files.push(data.pdfUrl);
-            
-            // Auto-download each batch
-            const link = document.createElement('a');
-            link.href = data.pdfUrl;
-            link.download = data.filename || `${storyTitle}_part${batchCount}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          }
-
-          if (data?.pagination) {
-            hasMorePages = data.pagination.hasMorePages;
-            pageOffset = data.pagination.pageOffset + data.pagination.pageLimit;
-            batchCount++;
-          } else {
-            hasMorePages = false;
-          }
-
-          // Small delay between batches
-          if (hasMorePages) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
+      console.log('Generating complete PDF for story:', storyId);
+      
+      const { data, error } = await supabase.functions.invoke('generate-story-pdf', {
+        body: {
+          storyId,
+          usePagination: false // Generate all pages in a single PDF
         }
+      });
 
-        if (files.length > 0) {
-          toast.success(`PDF exported successfully! Downloaded ${files.length} file(s) for "${storyTitle}".`);
-        }
-      } else {
-        // For smaller stories (8 pages or less), generate complete PDF
-        toast.info(`Generating complete PDF for "${storyTitle}" (${pageCount} pages)...`);
-        
-        const { data, error } = await supabase.functions.invoke('generate-story-pdf', {
-          body: {
-            storyId,
-            includeAllPages: true
-          }
-        });
-
-        if (error) {
-          console.error('Error generating PDF:', error);
-          toast.error('Failed to generate PDF');
-          return;
-        }
-        
-        if (data?.pdfUrl) {
-          // Auto-download the complete PDF
-          const link = document.createElement('a');
-          link.href = data.pdfUrl;
-          link.download = data.filename || `${storyTitle}_complete.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          toast.success(`Complete PDF exported successfully! Generated ${data.pagination?.processedPages || 0} pages for "${storyTitle}".`);
-        }
+      if (error) {
+        console.error('Error generating PDF:', error);
+        toast.error('Failed to generate PDF');
+        return;
       }
-    } catch (err) {
-      console.error('Error downloading PDF:', err);
-      toast.error('Failed to download PDF');
+      
+      if (data?.pdfUrl) {
+        // Auto-download the complete PDF
+        const link = document.createElement('a');
+        link.href = data.pdfUrl;
+        link.download = data.filename || `story_${storyId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success('Complete PDF generated and downloaded successfully!');
+      } else {
+        toast.error('No PDF URL received');
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.error('Failed to generate PDF');
     }
   };
 

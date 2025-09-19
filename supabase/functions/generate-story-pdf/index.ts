@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { storyId, pageOffset = 0, pageLimit = 3, includeAllPages = false } = await req.json();
+    const { storyId, pageOffset = 0, pageLimit = null, usePagination = false } = await req.json();
     if (!storyId) {
       return new Response(JSON.stringify({ error: "Missing storyId" }), {
         status: 400,
@@ -23,8 +23,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`generate-story-pdf: Processing story: ${storyId}, includeAllPages: ${includeAllPages}, offset: ${pageOffset}, limit: ${pageLimit}`);
-    console.log(`Memory usage at start: ${(performance as any).memory?.usedJSHeapSize || 'unknown'} bytes`);
+    console.log(`generate-story-pdf: Processing story: ${storyId}, offset: ${pageOffset}, limit: ${pageLimit || 'all'}, pagination: ${usePagination}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -52,7 +51,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch all pages
+    // Fetch pages with pagination
     const { data: allPages, error: pagesError } = await supabaseUser
       .from("story_pages")
       .select("id, page_number, text_content, image_url")
@@ -67,38 +66,30 @@ serve(async (req) => {
       });
     }
 
+    // Apply pagination only if explicitly requested
     const totalPages = allPages?.length || 0;
-    console.log(`Total pages in story: ${totalPages}`);
+    let paginatedPages, hasMorePages;
     
-    // Limit processing for resource management
-    let pagesToProcess;
-    let hasMorePages = false;
-    
-    if (includeAllPages) {
-      // For large stories, limit to 8 pages to prevent resource exhaustion
-      if (totalPages > 8) {
-        console.log(`Story has ${totalPages} pages, limiting to first 8 pages to prevent resource exhaustion`);
-        pagesToProcess = allPages?.slice(0, 8) || [];
-        hasMorePages = totalPages > 8;
-      } else {
-        pagesToProcess = allPages || [];
-      }
-      console.log(`Processing ${pagesToProcess.length} pages in single PDF (limited for resource management)`);
-    } else {
-      // Use pagination
-      pagesToProcess = allPages?.slice(pageOffset, pageOffset + pageLimit) || [];
+    if (usePagination && pageLimit) {
+      // Use pagination - process only a subset of pages
+      paginatedPages = allPages?.slice(pageOffset, pageOffset + pageLimit) || [];
       hasMorePages = pageOffset + pageLimit < totalPages;
-      console.log(`Processing ${pagesToProcess.length} pages (${pageOffset + 1}-${pageOffset + pagesToProcess.length} of ${totalPages})`);
+      console.log(`Processing ${paginatedPages.length} pages (${pageOffset + 1}-${pageOffset + paginatedPages.length} of ${totalPages}) with pagination`);
+    } else {
+      // Process all pages at once
+      paginatedPages = allPages || [];
+      hasMorePages = false;
+      console.log(`Processing all ${paginatedPages.length} pages in single PDF`);
     }
 
-    // Build PDF with resource monitoring
-    const pdfBytes = await buildPdf(story, pagesToProcess, includeAllPages || pageOffset === 0);
+    // Build PDF with selected pages
+    const pdfBytes = await buildPdf(story, paginatedPages, !usePagination || pageOffset === 0);
 
-    // Upload to storage
+    // Upload to storage with appropriate filename
     const safeTitle = String(story.title || 'story').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = includeAllPages || pageOffset === 0 
-      ? `${safeTitle}_complete_${Date.now()}.pdf`
-      : `${safeTitle}_${Date.now()}_part${Math.floor(pageOffset / pageLimit) + 1}.pdf`;
+    const filename = usePagination && pageLimit && pageOffset > 0
+      ? `${safeTitle}_${Date.now()}_part${Math.floor(pageOffset / pageLimit) + 1}.pdf`
+      : `${safeTitle}_${Date.now()}.pdf`;
     const storagePath = `${story.user_id}/${story.id}/${filename}`;
 
     const { error: uploadError } = await supabaseService.storage
@@ -130,25 +121,31 @@ serve(async (req) => {
       });
     }
 
-    // Update story with pdf_url
-    if (includeAllPages || pageOffset === 0) {
+    // Update story with pdf_url for complete PDFs (not paginated parts)
+    if (!usePagination || pageOffset === 0) {
       await supabaseService.from("stories").update({ pdf_url: storagePath }).eq("id", storyId);
     }
 
+    // Prepare response based on pagination setting
+    const responseData: any = { 
+      success: true, 
+      pdfUrl: signed?.signedUrl, 
+      filename
+    };
+
+    // Only include pagination info if pagination is being used
+    if (usePagination && pageLimit) {
+      responseData.pagination = {
+        pageOffset,
+        pageLimit,
+        totalPages,
+        hasMorePages,
+        processedPages: paginatedPages.length
+      };
+    }
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        pdfUrl: signed?.signedUrl, 
-        filename,
-        pagination: {
-          pageOffset,
-          pageLimit,
-          totalPages,
-          hasMorePages,
-          processedPages: pagesToProcess.length,
-          includeAllPages
-        }
-      }),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
@@ -163,7 +160,6 @@ serve(async (req) => {
 async function buildPdf(story: any, pages: Array<any>, includeCover = true): Promise<Uint8Array> {
   const startTime = Date.now();
   console.log(`Starting PDF generation with images for ${pages.length} pages (cover: ${includeCover})`);
-  console.log(`Memory before PDF creation: ${(performance as any).memory?.usedJSHeapSize || 'unknown'} bytes`);
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -188,11 +184,10 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
     }
   }
 
-  // Process pages in current batch with memory monitoring
+  // Process pages in current batch
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
     console.log(`Processing page ${p.page_number} (${i + 1}/${pages.length})`);
-    console.log(`Memory before page ${p.page_number}: ${(performance as any).memory?.usedJSHeapSize || 'unknown'} bytes`);
     
     const page = pdfDoc.addPage([612, 792]);
     const { width, height } = page.getSize();
@@ -209,7 +204,7 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
     });
     cursorY -= 25;
 
-    // Process image first if available with enhanced error handling
+    // Process image first if available
     if (p.image_url) {
       console.log(`🖼️ Processing image for page ${p.page_number}: ${p.image_url.substring(0, 100)}...`);
       
@@ -218,17 +213,17 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
         if (imageResult) {
           const { image, width: imgWidth, height: imgHeight } = imageResult;
           
-          // Calculate image dimensions - reduced max size for memory efficiency
+          // Calculate larger image dimensions for better visual impact
           const maxImageWidth = width - margin * 2;
-          const maxImageHeight = 350; // Reduced from 400 to save memory
+          const maxImageHeight = 400; // Increased from 200 for bigger images
           
           let drawWidth = imgWidth;
           let drawHeight = imgHeight;
           
-          // Scale image to fit with memory-conscious scaling
+          // Scale image to fit - allow larger scale for better visibility
           const widthScale = maxImageWidth / drawWidth;
           const heightScale = maxImageHeight / drawHeight;
-          const scale = Math.min(widthScale, heightScale, 1.0); // Reduced from 1.2 to 1.0
+          const scale = Math.min(widthScale, heightScale, 1.2); // Increased from 0.8 to 1.2
           
           drawWidth = drawWidth * scale;
           drawHeight = drawHeight * scale;
@@ -237,23 +232,15 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
           const imageX = margin + (maxImageWidth - drawWidth) / 2;
           const imageY = cursorY - drawHeight;
           
-          // Ensure image fits on page
-          if (imageY < 60) {
-            console.warn(`Image too large for page ${p.page_number}, reducing size`);
-            const scaleFactor = (cursorY - 100) / drawHeight;
-            drawWidth *= scaleFactor;
-            drawHeight *= scaleFactor;
-          }
-          
           page.drawImage(image, {
             x: imageX,
-            y: Math.max(imageY, 60),
+            y: imageY,
             width: drawWidth,
             height: drawHeight,
           });
           
           console.log(`✅ Image embedded successfully at ${drawWidth}x${drawHeight}`);
-          cursorY = Math.max(imageY, 60) - 20; // Adjusted spacing
+          cursorY = imageY - 30; // Increased spacing between image and text
         } else {
           // Image failed - show informative placeholder
           console.warn(`⚠️ Could not process image for page ${p.page_number}`);
@@ -285,14 +272,10 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
       cursorY -= 10;
       cursorY = drawTextWrapped(page, String(p.text_content), font, 12, margin, cursorY, width - margin * 2, 18);
     }
-    
-    console.log(`Memory after page ${p.page_number}: ${(performance as any).memory?.usedJSHeapSize || 'unknown'} bytes`);
   }
 
-  console.log(`Memory before PDF save: ${(performance as any).memory?.usedJSHeapSize || 'unknown'} bytes`);
   const pdfBytes = await pdfDoc.save();
   console.log(`PDF generation completed in ${Date.now() - startTime}ms`);
-  console.log(`Final PDF size: ${pdfBytes.length} bytes`);
   return pdfBytes;
 }
 
@@ -303,7 +286,7 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-// Memory-optimized image embedding function
+// Simplified image embedding function - no conversion, just direct embedding
 async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
   try {
     console.log(`🖼️ Processing image: ${imageUrl.substring(0, 100)}...`);
@@ -317,9 +300,9 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
       imageBytes = base64ToBytes(base64Data);
       console.log(`Processing base64 image: ${imageBytes.length} bytes`);
     } else {
-      // Handle remote images with shorter timeout for better resource management
+      // Handle remote images with timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced from 5000 to 3000
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       try {
         const response = await fetch(imageUrl, { 
@@ -332,33 +315,31 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
           return null;
         }
         
-        const arrayBuffer = await response.arrayBuffer();
-        imageBytes = new Uint8Array(arrayBuffer);
+        imageBytes = new Uint8Array(await response.arrayBuffer());
         console.log(`Processing remote image: ${imageBytes.length} bytes`);
       } finally {
         clearTimeout(timeoutId);
       }
     }
     
-    // Stricter size check for memory management
-    if (imageBytes.length > 2 * 1024 * 1024) { // Reduced from 3MB to 2MB
-      console.warn(`Image too large for memory constraints: ${imageBytes.length} bytes, skipping`);
+    // Size check - reasonable limit
+    if (imageBytes.length > 3 * 1024 * 1024) { // 3MB limit
+      console.warn(`Image too large: ${imageBytes.length} bytes`);
       return null;
     }
     
-    // Try embedding as different formats with better error handling
+    // Try embedding as different formats
     try {
       const img = await pdfDoc.embedJpg(imageBytes);
-      console.log(`✅ Successfully embedded JPEG (${img.width}x${img.height})`);
+      console.log(`✅ Successfully embedded as JPEG`);
       return { image: img, width: img.width, height: img.height };
     } catch (jpgError) {
-      console.log(`JPEG embedding failed, trying PNG: ${jpgError.message}`);
       try {
         const img = await pdfDoc.embedPng(imageBytes);
-        console.log(`✅ Successfully embedded PNG (${img.width}x${img.height})`);
+        console.log(`✅ Successfully embedded as PNG`);
         return { image: img, width: img.width, height: img.height };
       } catch (pngError) {
-        console.warn(`Could not embed image in any format - JPEG: ${jpgError.message}, PNG: ${pngError.message}`);
+        console.warn(`Could not embed image - unsupported format`);
         return null;
       }
     }
