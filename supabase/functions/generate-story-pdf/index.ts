@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { storyId, pageOffset = 0, pageLimit = 3 } = await req.json();
+    const { storyId, pageOffset = 0, pageLimit = 3, includeAllPages = false } = await req.json();
     if (!storyId) {
       return new Response(JSON.stringify({ error: "Missing storyId" }), {
         status: 400,
@@ -23,7 +23,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`generate-story-pdf: Processing story: ${storyId}, offset: ${pageOffset}, limit: ${pageLimit}`);
+    console.log(`generate-story-pdf: Processing story: ${storyId}, includeAllPages: ${includeAllPages}, offset: ${pageOffset}, limit: ${pageLimit}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -51,7 +51,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch pages with pagination
+    // Fetch all pages
     const { data: allPages, error: pagesError } = await supabaseUser
       .from("story_pages")
       .select("id, page_number, text_content, image_url")
@@ -66,20 +66,30 @@ serve(async (req) => {
       });
     }
 
-    // Apply pagination
     const totalPages = allPages?.length || 0;
-    const paginatedPages = allPages?.slice(pageOffset, pageOffset + pageLimit) || [];
-    const hasMorePages = pageOffset + pageLimit < totalPages;
     
-    console.log(`Processing ${paginatedPages.length} pages (${pageOffset + 1}-${pageOffset + paginatedPages.length} of ${totalPages})`);
+    // Decide which pages to process
+    let pagesToProcess;
+    let hasMorePages = false;
+    
+    if (includeAllPages) {
+      // Process all pages in one PDF
+      pagesToProcess = allPages || [];
+      console.log(`Processing ALL ${pagesToProcess.length} pages in single PDF`);
+    } else {
+      // Use pagination
+      pagesToProcess = allPages?.slice(pageOffset, pageOffset + pageLimit) || [];
+      hasMorePages = pageOffset + pageLimit < totalPages;
+      console.log(`Processing ${pagesToProcess.length} pages (${pageOffset + 1}-${pageOffset + pagesToProcess.length} of ${totalPages})`);
+    }
 
-    // Build PDF with paginated pages
-    const pdfBytes = await buildPdf(story, paginatedPages, pageOffset === 0);
+    // Build PDF
+    const pdfBytes = await buildPdf(story, pagesToProcess, includeAllPages || pageOffset === 0);
 
-    // Upload to storage with pagination info
+    // Upload to storage
     const safeTitle = String(story.title || 'story').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = pageOffset === 0 
-      ? `${safeTitle}_${Date.now()}.pdf`
+    const filename = includeAllPages || pageOffset === 0 
+      ? `${safeTitle}_complete_${Date.now()}.pdf`
       : `${safeTitle}_${Date.now()}_part${Math.floor(pageOffset / pageLimit) + 1}.pdf`;
     const storagePath = `${story.user_id}/${story.id}/${filename}`;
 
@@ -112,8 +122,8 @@ serve(async (req) => {
       });
     }
 
-    // Update story with pdf_url only for the first page batch
-    if (pageOffset === 0) {
+    // Update story with pdf_url
+    if (includeAllPages || pageOffset === 0) {
       await supabaseService.from("stories").update({ pdf_url: storagePath }).eq("id", storyId);
     }
 
@@ -127,7 +137,8 @@ serve(async (req) => {
           pageLimit,
           totalPages,
           hasMorePages,
-          processedPages: paginatedPages.length
+          processedPages: pagesToProcess.length,
+          includeAllPages
         }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
