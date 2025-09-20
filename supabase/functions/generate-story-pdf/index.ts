@@ -219,14 +219,14 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
         if (imageResult) {
           const { image, width: imgWidth, height: imgHeight } = imageResult;
           
-          // Calculate image dimensions - prevent too large images
+          // Calculate image dimensions - ensure full images are shown
           const maxImageWidth = width - margin * 2;
-          const maxImageHeight = 300; // Reasonable height limit
+          const maxImageHeight = Math.min(500, cursorY - 120); // Allow larger images, respect page space
           
           let drawWidth = imgWidth;
           let drawHeight = imgHeight;
           
-          // Scale image to fit properly
+          // Scale image to fit properly, preserve aspect ratio
           const widthScale = maxImageWidth / drawWidth;
           const heightScale = maxImageHeight / drawHeight;
           const scale = Math.min(widthScale, heightScale, 1.0); // Don't upscale
@@ -234,10 +234,13 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
           drawWidth = Math.floor(drawWidth * scale);
           drawHeight = Math.floor(drawHeight * scale);
           
-          // Ensure image fits on page
-          if (cursorY - drawHeight < 100) {
-            drawHeight = Math.max(cursorY - 100, 50); // Minimum height
-            drawWidth = Math.floor(drawWidth * (drawHeight / (drawHeight / scale)));
+          // Ensure minimum image size for visibility
+          if (drawHeight < 100 && cursorY > 200) {
+            const minScale = 100 / imgHeight;
+            if (minScale <= 1.0) {
+              drawHeight = 100;
+              drawWidth = Math.floor(imgWidth * minScale);
+            }
           }
           
           // Center the image horizontally
@@ -254,25 +257,36 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
           console.log(`✅ Image embedded at ${drawWidth}x${drawHeight}`);
           cursorY = imageY - 20;
         } else {
-          // Image failed - show informative placeholder
-          console.warn(`⚠️ Could not process image for page ${p.page_number}`);
+          // Image failed - show detailed error and skip gracefully
+          console.error(`❌ CRITICAL: Image failed for page ${p.page_number}, URL: ${p.image_url}`);
           cursorY -= 10;
+          
+          // Try to identify the issue
           if (p.image_url?.includes('.webp')) {
-            page.drawText('[WebP image - not supported in PDF format]', {
-              x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
+            page.drawText('[WebP format - conversion needed]', {
+              x: margin, y: cursorY, size: 10, font, color: rgb(0.8, 0.2, 0.2)
+            });
+            console.log(`WebP image detected - may need format conversion: ${p.image_url}`);
+          } else if (p.image_url?.startsWith('data:')) {
+            page.drawText('[Base64 image - processing failed]', {
+              x: margin, y: cursorY, size: 10, font, color: rgb(0.8, 0.2, 0.2)
             });
           } else {
-            page.drawText('[Image could not be processed]', {
-              x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
+            page.drawText('[Remote image - fetch/processing failed]', {
+              x: margin, y: cursorY, size: 10, font, color: rgb(0.8, 0.2, 0.2)
             });
           }
           cursorY -= 25;
         }
       } catch (imageError: any) {
-        console.error(`💥 Image processing failed for page ${p.page_number}:`, imageError.message);
+        console.error(`💥 CRITICAL ERROR: Image processing failed for page ${p.page_number}:`, {
+          error: imageError.message,
+          stack: imageError.stack,
+          url: p.image_url?.substring(0, 100)
+        });
         cursorY -= 10;
-        page.drawText('[Image processing failed]', {
-          x: margin, y: cursorY, size: 10, font, color: rgb(0.7, 0.7, 0.7)
+        page.drawText(`[ERROR: ${imageError.message.substring(0, 50)}...]`, {
+          x: margin, y: cursorY, size: 10, font, color: rgb(0.8, 0.2, 0.2)
         });
         cursorY -= 25;
       }
@@ -311,9 +325,9 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
       imageBytes = base64ToBytes(base64Data);
       console.log(`Base64 image: ${imageBytes.length} bytes`);
     } else {
-      // Handle remote images with shorter timeout
+      // Handle remote images with adequate timeout for processing
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // Allow more time for image processing
       
       try {
         const response = await fetch(imageUrl, { 
@@ -333,27 +347,37 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
       }
     }
     
-    // Stricter size limit
-    if (imageBytes.length > 1.5 * 1024 * 1024) { // 1.5MB limit
-      console.warn(`Image too large: ${imageBytes.length} bytes`);
-      return null;
+    // Allow larger images to ensure all images are included
+    if (imageBytes.length > 3 * 1024 * 1024) { // 3MB limit - more generous
+      console.warn(`Image too large: ${imageBytes.length} bytes, attempting to process anyway`);
+      // Don't return null, try to process it anyway
     }
     
-    // Try embedding as different formats
+    // Try embedding as different formats with retries
+    console.log(`Attempting to embed image format detection...`);
+    
+    // First try JPEG
     try {
       const img = await pdfDoc.embedJpg(imageBytes);
-      console.log(`✅ Embedded JPEG`);
+      console.log(`✅ Successfully embedded as JPEG (${img.width}x${img.height})`);
       return { image: img, width: img.width, height: img.height };
     } catch (jpgError) {
-      try {
-        const img = await pdfDoc.embedPng(imageBytes);
-        console.log(`✅ Embedded PNG`);
-        return { image: img, width: img.width, height: img.height };
-      } catch (pngError) {
-        console.warn(`Unsupported image format`);
-        return null;
-      }
+      console.log(`JPEG embedding failed: ${jpgError.message}`);
     }
+    
+    // Then try PNG
+    try {
+      const img = await pdfDoc.embedPng(imageBytes);
+      console.log(`✅ Successfully embedded as PNG (${img.width}x${img.height})`);
+      return { image: img, width: img.width, height: img.height };
+    } catch (pngError) {
+      console.log(`PNG embedding failed: ${pngError.message}`);
+    }
+    
+    // Log format detection details
+    const header = Array.from(imageBytes.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    console.error(`❌ Could not embed image. Header: ${header}, Size: ${imageBytes.length} bytes`);
+    return null;
   } catch (error: any) {
     console.warn(`Image processing failed: ${error.message}`);
     return null;
