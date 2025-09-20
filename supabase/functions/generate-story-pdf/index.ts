@@ -159,7 +159,13 @@ serve(async (req) => {
 
 async function buildPdf(story: any, pages: Array<any>, includeCover = true): Promise<Uint8Array> {
   const startTime = Date.now();
-  console.log(`Starting PDF generation with images for ${pages.length} pages (cover: ${includeCover})`);
+  console.log(`Starting PDF generation for ${pages.length} pages (cover: ${includeCover})`);
+  
+  // Limit pages to prevent memory issues
+  const limitedPages = pages.slice(0, 50); // Max 50 pages to prevent resource issues
+  if (limitedPages.length < pages.length) {
+    console.warn(`Limited to ${limitedPages.length} pages (original: ${pages.length})`);
+  }
   
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -185,9 +191,9 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
   }
 
   // Process pages in current batch
-  for (let i = 0; i < pages.length; i++) {
-    const p = pages[i];
-    console.log(`Processing page ${p.page_number} (${i + 1}/${pages.length})`);
+  for (let i = 0; i < limitedPages.length; i++) {
+    const p = limitedPages[i];
+    console.log(`Processing page ${p.page_number} (${i + 1}/${limitedPages.length})`);
     
     const page = pdfDoc.addPage([612, 792]);
     const { width, height } = page.getSize();
@@ -213,20 +219,26 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
         if (imageResult) {
           const { image, width: imgWidth, height: imgHeight } = imageResult;
           
-          // Calculate larger image dimensions for better visual impact
+          // Calculate image dimensions - prevent too large images
           const maxImageWidth = width - margin * 2;
-          const maxImageHeight = 400; // Increased from 200 for bigger images
+          const maxImageHeight = 300; // Reasonable height limit
           
           let drawWidth = imgWidth;
           let drawHeight = imgHeight;
           
-          // Scale image to fit - allow larger scale for better visibility
+          // Scale image to fit properly
           const widthScale = maxImageWidth / drawWidth;
           const heightScale = maxImageHeight / drawHeight;
-          const scale = Math.min(widthScale, heightScale, 1.2); // Increased from 0.8 to 1.2
+          const scale = Math.min(widthScale, heightScale, 1.0); // Don't upscale
           
-          drawWidth = drawWidth * scale;
-          drawHeight = drawHeight * scale;
+          drawWidth = Math.floor(drawWidth * scale);
+          drawHeight = Math.floor(drawHeight * scale);
+          
+          // Ensure image fits on page
+          if (cursorY - drawHeight < 100) {
+            drawHeight = Math.max(cursorY - 100, 50); // Minimum height
+            drawWidth = Math.floor(drawWidth * (drawHeight / (drawHeight / scale)));
+          }
           
           // Center the image horizontally
           const imageX = margin + (maxImageWidth - drawWidth) / 2;
@@ -239,8 +251,8 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
             height: drawHeight,
           });
           
-          console.log(`✅ Image embedded successfully at ${drawWidth}x${drawHeight}`);
-          cursorY = imageY - 30; // Increased spacing between image and text
+          console.log(`✅ Image embedded at ${drawWidth}x${drawHeight}`);
+          cursorY = imageY - 20;
         } else {
           // Image failed - show informative placeholder
           console.warn(`⚠️ Could not process image for page ${p.page_number}`);
@@ -267,10 +279,9 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
     }
 
     // Add text content with proper spacing and better readability
-    if (p.text_content) {
-      // Add extra space before text for better visual separation
+    if (p.text_content && cursorY > 100) {
       cursorY -= 10;
-      cursorY = drawTextWrapped(page, String(p.text_content), font, 12, margin, cursorY, width - margin * 2, 18);
+      cursorY = drawTextWrapped(pdfDoc, page, String(p.text_content), font, 12, margin, cursorY, width - margin * 2, 18);
     }
   }
 
@@ -286,10 +297,10 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-// Simplified image embedding function - no conversion, just direct embedding
+// Optimized image embedding with strict resource limits
 async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promise<{ image: any; width: number; height: number } | null> {
   try {
-    console.log(`🖼️ Processing image: ${imageUrl.substring(0, 100)}...`);
+    console.log(`🖼️ Processing image: ${imageUrl.substring(0, 80)}...`);
     
     let imageBytes: Uint8Array;
     
@@ -298,11 +309,11 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
       const [, base64Data] = imageUrl.split(',');
       if (!base64Data) return null;
       imageBytes = base64ToBytes(base64Data);
-      console.log(`Processing base64 image: ${imageBytes.length} bytes`);
+      console.log(`Base64 image: ${imageBytes.length} bytes`);
     } else {
-      // Handle remote images with timeout
+      // Handle remote images with shorter timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
       
       try {
         const response = await fetch(imageUrl, { 
@@ -311,19 +322,19 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
         });
         
         if (!response.ok) {
-          console.warn(`Fetch failed: ${response.status} for ${imageUrl}`);
+          console.warn(`Fetch failed: ${response.status}`);
           return null;
         }
         
         imageBytes = new Uint8Array(await response.arrayBuffer());
-        console.log(`Processing remote image: ${imageBytes.length} bytes`);
+        console.log(`Remote image: ${imageBytes.length} bytes`);
       } finally {
         clearTimeout(timeoutId);
       }
     }
     
-    // Size check - reasonable limit
-    if (imageBytes.length > 3 * 1024 * 1024) { // 3MB limit
+    // Stricter size limit
+    if (imageBytes.length > 1.5 * 1024 * 1024) { // 1.5MB limit
       console.warn(`Image too large: ${imageBytes.length} bytes`);
       return null;
     }
@@ -331,15 +342,15 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
     // Try embedding as different formats
     try {
       const img = await pdfDoc.embedJpg(imageBytes);
-      console.log(`✅ Successfully embedded as JPEG`);
+      console.log(`✅ Embedded JPEG`);
       return { image: img, width: img.width, height: img.height };
     } catch (jpgError) {
       try {
         const img = await pdfDoc.embedPng(imageBytes);
-        console.log(`✅ Successfully embedded as PNG`);
+        console.log(`✅ Embedded PNG`);
         return { image: img, width: img.width, height: img.height };
       } catch (pngError) {
-        console.warn(`Could not embed image - unsupported format`);
+        console.warn(`Unsupported image format`);
         return null;
       }
     }
@@ -350,7 +361,8 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
 }
 
 function drawTextWrapped(
-  page: any,
+  pdfDoc: PDFDocument,
+  currentPage: any,
   text: string,
   font: any,
   fontSize: number,
@@ -359,16 +371,22 @@ function drawTextWrapped(
   maxWidth: number,
   lineHeight: number,
 ) {
+  // Prevent infinite recursion by limiting text length
+  if (text.length > 2000) {
+    text = text.substring(0, 2000) + "...";
+  }
+
   const words = text.split(/\s+/);
   let line = '';
   let y = startY;
+  let page = currentPage;
 
   const lines: string[] = [];
   for (const word of words) {
     const testLine = line ? `${line} ${word}` : word;
     const width = font.widthOfTextAtSize(testLine, fontSize);
-    if (width > maxWidth) {
-      if (line) lines.push(line);
+    if (width > maxWidth && line) {
+      lines.push(line);
       line = word;
     } else {
       line = testLine;
@@ -376,12 +394,15 @@ function drawTextWrapped(
   }
   if (line) lines.push(line);
 
-  for (const l of lines) {
+  // Limit number of lines to prevent overflow
+  const maxLines = Math.floor((y - 60) / lineHeight);
+  const limitedLines = lines.slice(0, Math.max(1, maxLines));
+
+  for (const l of limitedLines) {
     if (y < 60) {
-      // New page if overflow
-      const newPage = page.doc.addPage([612, 792]);
-      page = newPage;
-      y = 792 - 60;
+      // Stop if we run out of space - don't create new pages from text overflow
+      console.warn("Text truncated - insufficient space on page");
+      break;
     }
     page.drawText(l, { x, y, size: fontSize, font, color: rgb(0, 0, 0) });
     y -= lineHeight;
