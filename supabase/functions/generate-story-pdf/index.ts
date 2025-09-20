@@ -219,24 +219,24 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
         if (imageResult) {
           const { image, width: imgWidth, height: imgHeight } = imageResult;
           
-          // Calculate image dimensions - smaller images to reduce CPU usage
+          // Calculate image dimensions - reasonable size for good visibility
           const maxImageWidth = width - margin * 2;
-          const maxImageHeight = Math.min(200, cursorY - 120); // Smaller images to reduce processing
+          const maxImageHeight = Math.min(300, cursorY - 120); // Reasonable image size
           
           let drawWidth = imgWidth;
           let drawHeight = imgHeight;
           
-          // Aggressive scaling to reduce CPU usage
+          // Scale image to fit well while maintaining readability
           const widthScale = maxImageWidth / drawWidth;
           const heightScale = maxImageHeight / drawHeight;
-          const scale = Math.min(widthScale, heightScale, 0.3); // Much smaller images
+          const scale = Math.min(widthScale, heightScale, 0.6); // Good balance between size and performance
           
           drawWidth = Math.floor(drawWidth * scale);
           drawHeight = Math.floor(drawHeight * scale);
           
-          // Set minimum reasonable size
-          if (drawHeight < 80) {
-            drawHeight = 80;
+          // Set minimum reasonable size for visibility
+          if (drawHeight < 120) {
+            drawHeight = 120;
             drawWidth = Math.floor((drawHeight / imgHeight) * imgWidth);
           }
           
@@ -322,9 +322,9 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
       imageBytes = base64ToBytes(base64Data);
       console.log(`Base64 image: ${imageBytes.length} bytes`);
     } else {
-      // Handle remote images with shorter timeout to prevent CPU exhaustion
+      // Handle remote images with reasonable timeout 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000); // Shorter timeout to prevent resource exhaustion
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout - balance between speed and success
       
       try {
         const response = await fetch(imageUrl, { 
@@ -344,8 +344,8 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
       }
     }
     
-    // Strict image size limit to prevent CPU exhaustion
-    if (imageBytes.length > 500 * 1024) { // 500KB limit - very strict to prevent resource issues
+    // Reasonable image size limit to prevent CPU exhaustion while allowing most images
+    if (imageBytes.length > 2.5 * 1024 * 1024) { // 2.5MB limit - balance between inclusion and performance
       console.warn(`Image too large: ${imageBytes.length} bytes, skipping to prevent CPU timeout`);
       return null;
     }
