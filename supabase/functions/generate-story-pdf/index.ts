@@ -161,8 +161,8 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
   const startTime = Date.now();
   console.log(`Starting PDF generation for ${pages.length} pages (cover: ${includeCover})`);
   
-  // Limit pages to prevent memory issues
-  const limitedPages = pages.slice(0, 50); // Max 50 pages to prevent resource issues
+  // Aggressive page limiting to prevent CPU timeout
+  const limitedPages = pages.slice(0, 5); // Max 5 pages to prevent resource issues
   if (limitedPages.length < pages.length) {
     console.warn(`Limited to ${limitedPages.length} pages (original: ${pages.length})`);
   }
@@ -219,28 +219,25 @@ async function buildPdf(story: any, pages: Array<any>, includeCover = true): Pro
         if (imageResult) {
           const { image, width: imgWidth, height: imgHeight } = imageResult;
           
-          // Calculate image dimensions - ensure full images are shown
+          // Calculate image dimensions - smaller images to reduce CPU usage
           const maxImageWidth = width - margin * 2;
-          const maxImageHeight = Math.min(500, cursorY - 120); // Allow larger images, respect page space
+          const maxImageHeight = Math.min(200, cursorY - 120); // Smaller images to reduce processing
           
           let drawWidth = imgWidth;
           let drawHeight = imgHeight;
           
-          // Scale image to fit properly, preserve aspect ratio
+          // Aggressive scaling to reduce CPU usage
           const widthScale = maxImageWidth / drawWidth;
           const heightScale = maxImageHeight / drawHeight;
-          const scale = Math.min(widthScale, heightScale, 1.0); // Don't upscale
+          const scale = Math.min(widthScale, heightScale, 0.3); // Much smaller images
           
           drawWidth = Math.floor(drawWidth * scale);
           drawHeight = Math.floor(drawHeight * scale);
           
-          // Ensure minimum image size for visibility
-          if (drawHeight < 100 && cursorY > 200) {
-            const minScale = 100 / imgHeight;
-            if (minScale <= 1.0) {
-              drawHeight = 100;
-              drawWidth = Math.floor(imgWidth * minScale);
-            }
+          // Set minimum reasonable size
+          if (drawHeight < 80) {
+            drawHeight = 80;
+            drawWidth = Math.floor((drawHeight / imgHeight) * imgWidth);
           }
           
           // Center the image horizontally
@@ -325,9 +322,9 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
       imageBytes = base64ToBytes(base64Data);
       console.log(`Base64 image: ${imageBytes.length} bytes`);
     } else {
-      // Handle remote images with adequate timeout for processing
+      // Handle remote images with shorter timeout to prevent CPU exhaustion
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // Allow more time for image processing
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // Shorter timeout to prevent resource exhaustion
       
       try {
         const response = await fetch(imageUrl, { 
@@ -347,10 +344,10 @@ async function embedImageOptimized(pdfDoc: PDFDocument, imageUrl: string): Promi
       }
     }
     
-    // Allow larger images to ensure all images are included
-    if (imageBytes.length > 3 * 1024 * 1024) { // 3MB limit - more generous
-      console.warn(`Image too large: ${imageBytes.length} bytes, attempting to process anyway`);
-      // Don't return null, try to process it anyway
+    // Strict image size limit to prevent CPU exhaustion
+    if (imageBytes.length > 500 * 1024) { // 500KB limit - very strict to prevent resource issues
+      console.warn(`Image too large: ${imageBytes.length} bytes, skipping to prevent CPU timeout`);
+      return null;
     }
     
     // Try embedding as different formats with retries
